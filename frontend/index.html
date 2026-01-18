@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lighthouse | Your Personal Feed</title>
+    <meta name="description" content="A personal content aggregator to replace doomscrolling with intentional reading.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+
+<body>
+    <header>
+        <div class="logo">
+            <span class="icon">🗼</span>
+            <h1>Lighthouse</h1>
+        </div>
+        <nav>
+            <button id="refresh-btn" class="btn" onclick="refreshDashboard()">
+                <span>↻</span> Refresh
+            </button>
+            <a href="/sources" class="btn">
+                <span>⚙</span> Sources
+            </a>
+        </nav>
+    </header>
+
+    <main>
+        <!-- Today's Essentials -->
+        <section id="today-essentials">
+            <h2>📍 Today's Essentials</h2>
+            <div class="essentials-grid">
+                <div id="weather-card" class="card">
+                    <div class="loading">Loading weather...</div>
+                </div>
+                <div id="traffic-card" class="card">
+                    <div class="loading">Loading traffic...</div>
+                </div>
+                <div id="sports-card" class="card">
+                    <div class="loading">Loading games...</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Boston Sports -->
+        <section id="boston-sports" class="feed-section">
+            <h2>🏀 Boston Sports</h2>
+            <div class="article-grid" data-category="boston_sports">
+                <div class="loading">Loading articles...</div>
+            </div>
+        </section>
+
+        <!-- Your Other Teams -->
+        <section id="other-teams" class="feed-section">
+            <h2>⚾ Your Other Teams</h2>
+            <div class="article-grid" data-category="other_teams">
+                <div class="loading">Loading articles...</div>
+            </div>
+        </section>
+
+        <!-- League-Wide -->
+        <section id="league-wide" class="feed-section">
+            <h2>🏆 League-Wide</h2>
+            <div class="article-grid" data-category="league_wide">
+                <div class="loading">Loading articles...</div>
+            </div>
+        </section>
+
+        <!-- News -->
+        <section id="news" class="feed-section">
+            <h2>📰 News</h2>
+            <div class="article-grid" data-category="national_news">
+                <div class="loading">Loading articles...</div>
+            </div>
+        </section>
+
+        <!-- Local News (collapsed by default) -->
+        <section id="local-news" class="feed-section collapsed">
+            <h2 onclick="toggleSection('local-news')">📍 Local News <span class="toggle-icon">▶</span></h2>
+            <div class="article-grid" data-category="local_news">
+                <div class="loading">Loading articles...</div>
+            </div>
+        </section>
+
+        <!-- Long-Form -->
+        <section id="long-form" class="feed-section">
+            <h2>📖 Long-Form & Deep Dives</h2>
+            <div class="article-grid" data-category="long_form">
+                <div class="loading">Loading articles...</div>
+            </div>
+        </section>
+
+        <!-- Movies -->
+        <section id="movies" class="feed-section">
+            <h2>🎬 Movie Releases</h2>
+            <div class="article-grid" data-category="movies">
+                <div class="loading">Loading articles...</div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="footer-stats">
+            <span id="unread-count">-</span> unread articles
+            <span class="separator">•</span>
+            Last updated: <span id="last-updated">-</span>
+        </div>
+    </footer>
+
+    <script src="/static/js/dashboard.js"></script>
+</body>
+
+</html>
