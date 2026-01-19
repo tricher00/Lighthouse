@@ -244,9 +244,14 @@ function renderArticleCard(article) {
                 <div class="article-meta">
                     ${article.author ? `<span class="author">By ${escapeHtml(article.author)}</span>` : ''}
                 </div>
-                <div class="rating-buttons" onclick="event.stopPropagation()">
-                    <button class="rating-btn ${article.rating === 1 ? 'active' : ''}" onclick="rateArticle(${article.id}, 1)">👍</button>
-                    <button class="rating-btn ${article.rating === -1 ? 'active' : ''}" onclick="rateArticle(${article.id}, -1)">👎</button>
+                <div class="article-actions" onclick="event.stopPropagation()">
+                    <button class="mark-read-btn ${article.is_read ? 'active' : ''}" onclick="markAsRead(${article.id})" title="Mark as read">
+                        ${article.is_read ? '✓' : '○'}
+                    </button>
+                    <div class="rating-buttons">
+                        <button class="rating-btn ${article.rating === 1 ? 'active' : ''}" onclick="rateArticle(${article.id}, 1)">👍</button>
+                        <button class="rating-btn ${article.rating === -1 ? 'active' : ''}" onclick="rateArticle(${article.id}, -1)">👎</button>
+                    </div>
                 </div>
             </div>
         </article>
@@ -272,6 +277,30 @@ async function openArticle(url, articleId) {
     }
 }
 
+// Mark an article as read
+async function markAsRead(articleId) {
+    try {
+        const response = await fetch(`${API_BASE}/api/articles/${articleId}/read`, {
+            method: 'POST'
+        });
+
+        if (response.ok) {
+            // Update UI
+            const card = document.querySelector(`[data-id="${articleId}"]`);
+            if (card) {
+                card.classList.add('read');
+                const markReadBtn = card.querySelector('.mark-read-btn');
+                if (markReadBtn) {
+                    markReadBtn.classList.add('active');
+                    markReadBtn.textContent = '✓';
+                }
+            }
+        }
+    } catch (err) {
+        console.error('Failed to mark as read:', err);
+    }
+}
+
 // Rate an article
 async function rateArticle(articleId, rating) {
     try {
@@ -290,6 +319,9 @@ async function rateArticle(articleId, rating) {
 
                 thumbsUp.classList.toggle('active', rating === 1);
                 thumbsDown.classList.toggle('active', rating === -1);
+
+                // Also mark as read when rating
+                markAsRead(articleId);
             }
         }
     } catch (err) {

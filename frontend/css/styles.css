@@ -261,6 +261,39 @@ section h2 {
     line-height: 1.5;
 }
 
+/* Article actions (mark as read + rating buttons) */
+.article-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+/* Mark as read button */
+.mark-read-btn {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    font-size: 1rem;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    opacity: 0.5;
+    transition: all 0.2s ease;
+    color: var(--text-muted);
+}
+
+.mark-read-btn:hover {
+    opacity: 1;
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(56, 189, 248, 0.1);
+    transform: scale(1.05);
+}
+
+.mark-read-btn.active {
+    opacity: 1;
+    color: var(--success);
+    border-color: var(--success);
+}
+
 /* Rating buttons */
 .rating-buttons {
     display: flex;

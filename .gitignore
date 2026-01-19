@@ -52,3 +52,9 @@ Thumbs.db
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Debug/temp files
+*.txt
+!requirements.txt
+*.json
+!package.json
