@@ -133,10 +133,6 @@ lighthouse/
 └── requirements.txt
 ```
 
-## 🤝 Contributing
-
-Contributions welcome! Please read our contributing guidelines before submitting PRs.
-
 ## 📄 License
 
 MIT License - see [LICENSE](LICENSE) for details.
