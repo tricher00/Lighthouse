@@ -27,6 +27,7 @@ TEST_MODE = os.getenv("TEST_MODE", "False").lower() == "true"
 # API Keys
 OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY", "")  # Now optional, switched to NWS
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 # Reddit credentials now optional (using public JSON endpoints)
 REDDIT_CLIENT_ID = os.getenv("REDDIT_CLIENT_ID", "")
 REDDIT_CLIENT_SECRET = os.getenv("REDDIT_CLIENT_SECRET", "")

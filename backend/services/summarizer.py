@@ -1,36 +1,89 @@
 """
 LLM Summarization Service
-Uses Google Gemini to generate 3-5 sentence summaries for articles.
+Uses Groq (Llama 3) or Gemini to generate article summaries.
+Groq offers 14,400 requests/day free vs Gemini's 20/day.
 """
-from google import genai
 import asyncio
 import logging
+import httpx
 from typing import Optional
 from sqlalchemy.orm import Session
 
 from database import Article, SessionLocal
-from config import GEMINI_API_KEY, LLM_SUMMARY_ENABLED
+from config import GROQ_API_KEY, GEMINI_API_KEY, LLM_PROVIDER, LLM_SUMMARY_ENABLED
 
 logger = logging.getLogger("lighthouse")
 
+# Groq API endpoint
+GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 
-def get_client() -> Optional[genai.Client]:
-    """Initialize and return the Gemini client."""
-    if not GEMINI_API_KEY or not LLM_SUMMARY_ENABLED:
+
+async def summarize_with_groq(prompt: str) -> Optional[str]:
+    """Call Groq API with Llama 3."""
+    if not GROQ_API_KEY:
+        return None
+    
+    headers = {
+        "Authorization": f"Bearer {GROQ_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    
+    payload = {
+        "model": "llama-3.3-70b-versatile",
+        "messages": [
+            {"role": "user", "content": prompt}
+        ],
+        "temperature": 0.3,
+        "max_tokens": 500
+    }
+    
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.post(
+                GROQ_API_URL,
+                headers=headers,
+                json=payload,
+                timeout=30.0
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                return data["choices"][0]["message"]["content"]
+            else:
+                logger.warning(f"[WARN] Groq API error: {response.status_code} - {response.text[:200]}")
+                return None
+        except Exception as e:
+            logger.warning(f"[WARN] Groq request failed: {e}")
+            return None
+
+
+async def summarize_with_gemini(prompt: str) -> Optional[str]:
+    """Call Gemini API (fallback)."""
+    if not GEMINI_API_KEY:
         return None
     
     try:
+        from google import genai
         client = genai.Client(api_key=GEMINI_API_KEY)
-        return client
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt
+        )
+        if response and response.text:
+            return response.text
     except Exception as e:
-        logger.warning(f"[WARN] Failed to initialize Gemini client: {e}")
-        return None
+        logger.warning(f"[WARN] Gemini error: {e}")
+    
+    return None
 
 
 async def summarize_article(article: Article, db: Session) -> bool:
-    """Generate a summary for an article using Gemini (google-genai SDK)."""
-    client = get_client()
-    if not client:
+    """Generate a summary for an article."""
+    if not LLM_SUMMARY_ENABLED:
+        return False
+
+    # No need to summarize Reddit posts
+    if article.source == "Reddit":
         return False
     
     if article.summary_llm:
@@ -38,34 +91,34 @@ async def summarize_article(article: Article, db: Session) -> bool:
     
     logger.info(f"[LLM] Summarizing: {article.title}")
     
-    prompt = f"""
-    Summarize the following article in 3-5 concise bullet points or sentences. 
-    Focus on the "why it matters" and core facts. 
-    Avoid fluff. Use a professional but engaging tone.
+    # Build context from available info
+    context = article.summary or ""
     
-    Title: {article.title}
-    Original Summary/Snippet: {article.summary or "No summary provided."}
-    URL: {article.url}
+    prompt = f"""Write a brief 2-sentence summary for this news article. 
+Even if information is limited, provide what you can infer from the headline.
+Make sure summary is succient and don't waste space restating the prompt.
+
+Title: {article.title}
+{f'Context: {context}' if context else ''}
+
+Summary:"""
+
+    # Try Groq first (higher limits), then Gemini as fallback
+    result = None
     
-    If the article seems to be just a headline without much info, just say "No further details available."
-    """
+    if LLM_PROVIDER == "groq" and GROQ_API_KEY:
+        result = await summarize_with_groq(prompt)
     
-    try:
-        # Using the new genai SDK
-        response = client.models.generate_content(
-            model="gemini-1.5-flash",
-            contents=prompt
-        )
-        
-        if response and response.text:
-            article.summary_llm = response.text.strip()
-            db.commit()
-            return True
-        return False
-        
-    except Exception as e:
-        logger.warning(f"[WARN] Summarization error for {article.title}: {e}")
-        return False
+    if not result and GEMINI_API_KEY:
+        result = await summarize_with_gemini(prompt)
+    
+    if result:
+        article.summary_llm = result.strip()
+        db.commit()
+        logger.info(f"[LLM] Saved summary for: {article.title[:50]}")
+        return True
+    
+    return False
 
 
 async def summarize_latest_articles(limit: int = 10) -> int:
@@ -82,9 +135,8 @@ async def summarize_latest_articles(limit: int = 10) -> int:
         for article in articles:
             if await summarize_article(article, db):
                 count += 1
-                # Respect free tier rate limits (e.g., 5-15 RPM)
-                # 12 seconds = 5 RPM exactly. 
-                await asyncio.sleep(12)
+                # Groq allows 30 RPM, so 2 seconds between requests is safe
+                await asyncio.sleep(2)
                 
         return count
     finally:

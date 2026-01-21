@@ -60,6 +60,12 @@ A personal content aggregator that replaces doomscrolling with intentional readi
 6. **Open your browser**
    Navigate to `http://localhost:8000`
 
+7. **Stop the server** (when needed)
+   ```bash
+   # Windows - double-click stop.bat or run:
+   python stop.py
+   ```
+
 ## ⚙️ Configuration
 
 Edit `.env` to customize Lighthouse for your needs:
