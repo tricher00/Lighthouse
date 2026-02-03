@@ -201,13 +201,8 @@ def seed_rss_sources(db: Session):
     from database import Category
     
     category_map = {
-        "boston_sports": Category.BOSTON_SPORTS,
-        "other_teams": Category.OTHER_TEAMS,
-        "league_wide": Category.LEAGUE_WIDE,
         "national_news": Category.NATIONAL_NEWS,
-        "local_news": Category.LOCAL_NEWS,
         "long_form": Category.LONG_FORM,
-        "movies": Category.MOVIES,
     }
     
     added = 0

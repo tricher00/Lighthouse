@@ -75,10 +75,8 @@ FETCH_INTERVAL_TRAFFIC = 15 * 60    # 15 minutes
 FETCH_INTERVAL_SPORTS = 24 * 60 * 60  # Daily
 
 # LLM Settings
-LLM_PROVIDER = os.getenv("LLM_PROVIDER", "gemini")  # gemini or ollama
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "groq")  # groq or gemini
 LLM_SUMMARY_ENABLED = os.getenv("LLM_SUMMARY_ENABLED", "True").lower() == "true"
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3")
-OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 
 # Sports Teams (ESPN API IDs) - configurable via JSON env var
 # Format: [{"name": "Lakers", "league": "nba", "sport": "basketball", "id": "13"}, ...]

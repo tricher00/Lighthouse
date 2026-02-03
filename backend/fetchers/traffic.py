@@ -1,6 +1,6 @@
 """
 Traffic Alert Fetcher
-Fetches severe weather and traffic-impacting alerts for the North Andover/Wilmington area.
+Fetches weather and traffic-impacting alerts for the configured location.
 """
 import aiohttp
 import logging
