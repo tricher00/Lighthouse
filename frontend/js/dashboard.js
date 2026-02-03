@@ -25,8 +25,9 @@ async function refreshDashboard() {
         dashboardData = await response.json();
         console.log('✅ Dashboard data loaded', dashboardData);
 
-        renderWeather(dashboardData.weather);
-        renderTraffic(dashboardData.traffic);
+        const locationName = dashboardData.location_name || 'Your Location';
+        renderWeather(dashboardData.weather, locationName);
+        renderTraffic(dashboardData.traffic, locationName);
         renderGames(dashboardData.games);
         renderAllSections(dashboardData.sections);
         updateStats(dashboardData.stats);
@@ -38,7 +39,7 @@ async function refreshDashboard() {
 }
 
 // Render weather card
-function renderWeather(weather) {
+function renderWeather(weather, locationName) {
     const card = document.getElementById('weather-card');
 
     if (!weather) {
@@ -72,7 +73,7 @@ function renderWeather(weather) {
     card.innerHTML = `
         <div class="card-header">
             <span class="card-title">Weather</span>
-            <span class="card-meta">North Andover</span>
+            <span class="card-meta">${escapeHtml(locationName)}</span>
         </div>
         <div class="weather-display">
             <span class="weather-icon">${icon}</span>
@@ -92,14 +93,14 @@ function renderWeather(weather) {
 }
 
 // Render traffic card
-function renderTraffic(alerts) {
+function renderTraffic(alerts, locationName) {
     const card = document.getElementById('traffic-card');
 
     if (!alerts || alerts.length === 0) {
         card.innerHTML = `
             <div class="card-header">
                 <span class="card-title">Traffic</span>
-                <span class="card-meta">NA → Wilmington</span>
+                <span class="card-meta">${escapeHtml(locationName)}</span>
             </div>
             <div class="no-alerts">
                 <span>✅</span>

@@ -1,6 +1,6 @@
 """
 Sports Schedule Fetcher
-Fetches upcoming games for Boston teams and user-defined interests using ESPN API.
+Fetches upcoming games for configured teams using ESPN API.
 """
 import aiohttp
 from datetime import datetime, timedelta

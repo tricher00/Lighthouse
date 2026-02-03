@@ -1,6 +1,6 @@
 """
 Traffic Alert Fetcher
-Fetches severe weather and traffic-impacting alerts for the North Andover/Wilmington area.
+Fetches weather and traffic-impacting alerts for the configured location.
 """
 import aiohttp
 import logging
@@ -74,11 +74,11 @@ async def fetch_traffic_alerts() -> int:
                 # Add a static "Commute Status" placeholder for now if no alerts
                 if total_added == 0 and db.query(TrafficAlert).count() == 0:
                     commute_info = TrafficAlert(
-                        route="North Andover → Wilmington",
+                        route=f"{LOCATION_NAME} Commute",
                         alert_type="Commute Check",
-                        description="Main routes (I-93, Rt 125) appear clear. Recommended: Rt 125 for light traffic.",
+                        description=f"Standard routes for {LOCATION_NAME} area appear clear.",
                         severity="minor",
-                        location="Route 125, I-93",
+                        location=LOCATION_NAME,
                         reported_at=datetime.utcnow(),
                         expires_at=datetime.utcnow() + timedelta(hours=2)
                     )

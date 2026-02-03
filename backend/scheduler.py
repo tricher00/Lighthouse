@@ -72,7 +72,7 @@ def fetch_movies_job():
 
 
 def summarize_job():
-    """Job to summarize latest articles."""
+    """Job to summarize latest articles using Groq (14,400/day limit)."""
     logger.info("[CRON] Scheduled: Running summarizer...")
     from services.summarizer import summarize_latest_articles
     run_async(summarize_latest_articles(10))
@@ -127,7 +127,7 @@ def start_scheduler() -> BackgroundScheduler:
         replace_existing=True
     )
     
-    # Quick summarize job - every 5 minutes
+    # Summarize job - every 5 minutes (Groq allows 14,400/day)
     scheduler.add_job(
         summarize_job,
         trigger=IntervalTrigger(minutes=5),

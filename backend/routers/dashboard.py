@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc
 
 from database import get_db, Article, Source, Category, WeatherData, SportsSchedule, TrafficAlert
+from config import LOCATION_NAME
 
 router = APIRouter(prefix="/api", tags=["dashboard"])
 
@@ -77,6 +78,42 @@ async def get_dashboard(
         for game in upcoming_games
     ]
     
+    # Helper to deduplicate articles by similar titles
+    def dedupe_by_title(articles: list, threshold: float = 0.6) -> list:
+        """Remove articles with very similar titles (same story, different source)."""
+        import re
+        
+        def normalize(title: str) -> set:
+            # Extract significant words (ignore common words and source names)
+            words = re.findall(r'\b[a-z]{3,}\b', title.lower())
+            stopwords = {'the', 'and', 'for', 'are', 'but', 'not', 'you', 'all', 
+                        'can', 'had', 'her', 'was', 'one', 'our', 'out', 'has',
+                        'have', 'been', 'from', 'they', 'will', 'would', 'there',
+                        'their', 'what', 'about', 'which', 'when', 'make', 'like',
+                        'time', 'just', 'know', 'take', 'people', 'into', 'year',
+                        'your', 'good', 'some', 'could', 'them', 'than', 'then',
+                        'now', 'look', 'only', 'come', 'over', 'such', 'with',
+                        'news', 'report', 'says', 'said', 'after'}
+            return set(w for w in words if w not in stopwords)
+        
+        def similarity(t1: str, t2: str) -> float:
+            w1, w2 = normalize(t1), normalize(t2)
+            if not w1 or not w2:
+                return 0.0
+            intersection = len(w1 & w2)
+            return intersection / min(len(w1), len(w2))
+        
+        seen = []
+        for article in articles:
+            is_dupe = False
+            for existing in seen:
+                if similarity(article.title, existing.title) >= threshold:
+                    is_dupe = True
+                    break
+            if not is_dupe:
+                seen.append(article)
+        return seen
+    
     # Helper to get articles by category
     def get_articles_by_category(category: Category, limit: int = 8) -> List[Dict]:
         query = db.query(Article).join(Source).filter(
@@ -87,7 +124,11 @@ async def get_dashboard(
         if not include_read:
             query = query.filter(Article.is_read == False)
         
-        articles = query.order_by(desc(Article.published_at)).limit(limit).all()
+        # Fetch more than needed to allow for deduplication
+        articles = query.order_by(desc(Article.published_at)).limit(limit * 2).all()
+        
+        # Deduplicate similar titles
+        articles = dedupe_by_title(articles)[:limit]
         
         return [
             {
@@ -123,6 +164,7 @@ async def get_dashboard(
     total_unread = db.query(Article).filter(Article.is_read == False).count()
     
     return {
+        "location_name": LOCATION_NAME,
         "weather": weather_data,
         "traffic": traffic_data,
         "games": games_data,

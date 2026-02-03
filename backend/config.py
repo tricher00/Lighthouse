@@ -5,9 +5,26 @@ Loads settings from environment variables with sensible defaults.
 import os
 import json
 from pathlib import Path
+import logging
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# Check for CRLF line endings in .env file (can cause API key issues)
+def _check_env_line_endings():
+    env_path = Path(__file__).resolve().parent.parent / ".env"
+    if env_path.exists():
+        content = env_path.read_bytes()
+        if b'\r\n' in content:
+            logging.warning(
+                "[CONFIG] WARNING: .env file has CRLF line endings! "
+                "This can cause API keys to be invalid. "
+                "Convert to LF line endings to fix."
+            )
+            return False
+    return True
+
+_ENV_LINE_ENDINGS_OK = _check_env_line_endings()
 
 # Paths
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -27,6 +44,7 @@ TEST_MODE = os.getenv("TEST_MODE", "False").lower() == "true"
 # API Keys
 OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY", "")  # Now optional, switched to NWS
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 # Reddit credentials now optional (using public JSON endpoints)
 REDDIT_CLIENT_ID = os.getenv("REDDIT_CLIENT_ID", "")
 REDDIT_CLIENT_SECRET = os.getenv("REDDIT_CLIENT_SECRET", "")
@@ -57,10 +75,8 @@ FETCH_INTERVAL_TRAFFIC = 15 * 60    # 15 minutes
 FETCH_INTERVAL_SPORTS = 24 * 60 * 60  # Daily
 
 # LLM Settings
-LLM_PROVIDER = os.getenv("LLM_PROVIDER", "gemini")  # gemini or ollama
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "groq")  # groq or gemini
 LLM_SUMMARY_ENABLED = os.getenv("LLM_SUMMARY_ENABLED", "True").lower() == "true"
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3")
-OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 
 # Sports Teams (ESPN API IDs) - configurable via JSON env var
 # Format: [{"name": "Lakers", "league": "nba", "sport": "basketball", "id": "13"}, ...]

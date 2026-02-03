@@ -2,16 +2,15 @@
 
 A personal content aggregator that replaces doomscrolling with intentional reading. Lighthouse brings together your news, sports, weather, and more into a single, customizable dashboard.
 
-![Lighthouse Dashboard](docs/screenshot.png)
-
 ## ✨ Features
 
 - **📰 RSS Aggregation** - Pull from any RSS feed (news sites, blogs, The Athletic)
 - **🏀 Sports Schedule** - Track upcoming games for your favorite teams via ESPN
-- **🌤️ Local Weather** - Current conditions and alerts from National Weather Service
+- **🌤️ Local Weather** - Current conditions and forecasts from National Weather Service
 - **⚠️ Weather Alerts** - Severe weather warnings for your area
-- **🤖 AI Summaries** - Optional LLM-powered article summaries (via Gemini)
+- **🤖 AI Summaries** - Optional LLM-powered article summaries (Groq or Gemini)
 - **🎬 Movie Releases** - New releases and upcoming films from TMDB
+- **💬 Reddit Integration** - Top posts from your favorite subreddits
 - **📱 Mobile-Friendly** - Responsive dark mode UI
 
 ## 🚀 Quick Start
@@ -19,7 +18,8 @@ A personal content aggregator that replaces doomscrolling with intentional readi
 ### Prerequisites
 
 - Python 3.10+
-- (Optional) [Gemini API Key](https://ai.google.dev/) for AI summaries
+- (Optional) [Groq API Key](https://console.groq.com) for AI summaries (recommended - 14,400 free requests/day)
+- (Optional) [Gemini API Key](https://ai.google.dev/) for AI summaries (backup)
 
 ### Installation
 
@@ -60,16 +60,17 @@ A personal content aggregator that replaces doomscrolling with intentional readi
 6. **Open your browser**
    Navigate to `http://localhost:8000`
 
+7. **Stop the server** (when needed)
+   ```bash
+   # Windows - double-click stop.bat or run:
+   python stop.py
+   ```
+
 ## ⚙️ Configuration
 
 Edit `.env` to customize Lighthouse for your needs:
 
-### Required
-| Variable | Description |
-|----------|-------------|
-| `GEMINI_API_KEY` | Your Gemini API key for AI summaries |
-
-### Location
+### Location Settings
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `LOCATION_NAME` | Display name for your location | `New York, NY` |
@@ -77,7 +78,15 @@ Edit `.env` to customize Lighthouse for your needs:
 | `LOCATION_LON` | Longitude | `-74.0060` |
 | `NWS_ZONE_CODES` | NWS forecast zones (comma-separated) | `NYZ072,NYZ073` |
 
-### Sports Teams
+### LLM Summarization (Optional)
+| Variable | Description |
+|----------|-------------|
+| `LLM_PROVIDER` | `groq` (recommended) or `gemini` |
+| `GROQ_API_KEY` | Groq API key for fast, free summaries |
+| `GEMINI_API_KEY` | Gemini API key (backup option) |
+| `LLM_SUMMARY_ENABLED` | Enable AI summaries (`True`/`False`) |
+
+### Sports Teams (Optional)
 | Variable | Description |
 |----------|-------------|
 | `SPORTS_TEAMS_JSON` | JSON array of ESPN teams to track |
@@ -90,13 +99,28 @@ Example:
 ]
 ```
 
-### Optional
+### Reddit API (Optional)
+| Variable | Description |
+|----------|-------------|
+| `REDDIT_CLIENT_ID` | Reddit app client ID |
+| `REDDIT_CLIENT_SECRET` | Reddit app client secret |
+| `REDDIT_USER_AGENT` | User agent string |
+
+> **Note**: Reddit integration works without credentials using public JSON endpoints.
+
+### The Athletic (Optional)
 | Variable | Description |
 |----------|-------------|
 | `ATHLETIC_USERNAME` | The Athletic email for premium RSS |
 | `ATHLETIC_PASSWORD` | The Athletic password |
-| `LLM_SUMMARY_ENABLED` | Enable AI summaries (`True`/`False`) |
-| `TEST_MODE` | Skip external APIs, use sample data |
+
+### Server Settings
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `HOST` | Server host | `0.0.0.0` |
+| `PORT` | Server port | `8000` |
+| `DEBUG` | Debug mode | `True` |
+| `TEST_MODE` | Skip external APIs, use sample data | `False` |
 
 ## 🔧 Finding Your Settings
 
@@ -110,6 +134,11 @@ Example:
 2. The URL contains the team ID: `espn.com/nba/team/_/id/13/los-angeles-lakers`
 3. In this example, the ID is `13`
 
+### Reddit App Credentials
+1. Go to [reddit.com/prefs/apps](https://www.reddit.com/prefs/apps)
+2. Create a new "script" application
+3. Copy the client ID and secret
+
 ## 📁 Project Structure
 
 ```
@@ -118,19 +147,30 @@ lighthouse/
 │   ├── main.py           # FastAPI application
 │   ├── config.py         # Configuration loading
 │   ├── database.py       # SQLAlchemy models
+│   ├── scheduler.py      # Background task scheduling
 │   ├── fetchers/         # Data fetching modules
-│   │   ├── rss.py
-│   │   ├── weather.py
-│   │   ├── sports.py
-│   │   └── traffic.py
-│   └── routers/          # API endpoints
+│   │   ├── rss.py        # RSS feed parsing
+│   │   ├── weather.py    # NWS weather data
+│   │   ├── sports.py     # ESPN sports schedules
+│   │   ├── reddit.py     # Reddit posts
+│   │   ├── movies.py     # TMDB movie data
+│   │   └── traffic.py    # Traffic data (optional)
+│   ├── routers/          # API endpoints
+│   │   ├── dashboard.py  # Main dashboard API
+│   │   ├── articles.py   # Article endpoints
+│   │   └── sources.py    # Feed source management
+│   └── services/         # Business logic
+│       └── summarizer.py # LLM summarization
 ├── frontend/
 │   ├── index.html
 │   ├── css/styles.css
 │   └── js/dashboard.js
 ├── data/                 # Database & logs (gitignored)
 ├── .env.example
-└── requirements.txt
+├── requirements.txt
+├── stop.py               # Server shutdown script
+├── stop.bat              # Windows shutdown helper
+└── stop.ps1              # PowerShell shutdown script
 ```
 
 ## 📄 License
