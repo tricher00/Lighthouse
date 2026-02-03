@@ -176,34 +176,28 @@ async def fetch_all_reddit_sources() -> int:
 
 
 def seed_reddit_sources(db: Session):
-    """Seed the database with initial Reddit sources."""
+    """Seed the database with initial Reddit sources.
+    
+    NOTE: Team-specific and location-specific subreddits have been removed.
+    Users should add their own subreddits via the Sources UI.
+    This function now only seeds generic, location-agnostic sources.
+    """
     
     subreddits = [
-        # Boston Sports
-        {"name": "r/bostonceltics", "subreddit": "bostonceltics", "category": "boston_sports", "sort": "hot", "limit": 5},
-        {"name": "r/redsox", "subreddit": "redsox", "category": "boston_sports", "sort": "hot", "limit": 5},
-        {"name": "r/Patriots", "subreddit": "Patriots", "category": "boston_sports", "sort": "hot", "limit": 5},
-        {"name": "r/BostonBruins", "subreddit": "BostonBruins", "category": "boston_sports", "sort": "hot", "limit": 5},
-        
-        # Other Teams
-        {"name": "r/Padres", "subreddit": "Padres", "category": "other_teams", "sort": "hot", "limit": 3},
-        {"name": "r/UtahJazz", "subreddit": "UtahJazz", "category": "other_teams", "sort": "hot", "limit": 3},
-        {"name": "r/SyracuseOrange", "subreddit": "cuse", "category": "other_teams", "sort": "hot", "limit": 3},
-        
         # League-wide
         {"name": "r/nba", "subreddit": "nba", "category": "league_wide", "sort": "hot", "limit": 5},
         {"name": "r/baseball", "subreddit": "baseball", "category": "league_wide", "sort": "hot", "limit": 5},
+        {"name": "r/nfl", "subreddit": "nfl", "category": "league_wide", "sort": "hot", "limit": 5},
+        {"name": "r/hockey", "subreddit": "hockey", "category": "league_wide", "sort": "hot", "limit": 5},
         
         # National News
         {"name": "r/news", "subreddit": "news", "category": "national_news", "sort": "top", "limit": 10},
         {"name": "r/worldnews", "subreddit": "worldnews", "category": "national_news", "sort": "top", "limit": 5},
         
-        # Local
-        {"name": "r/boston", "subreddit": "boston", "category": "local_news", "sort": "hot", "limit": 5},
-        
         # Long-form
         {"name": "r/TrueReddit", "subreddit": "TrueReddit", "category": "long_form", "sort": "hot", "limit": 3},
     ]
+
     
     category_map = {
         "boston_sports": Category.BOSTON_SPORTS,

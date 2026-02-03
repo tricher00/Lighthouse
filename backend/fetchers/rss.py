@@ -181,36 +181,22 @@ async def fetch_all_rss_sources() -> int:
 
 
 def seed_rss_sources(db: Session):
-    """Seed the database with initial RSS sources."""
+    """Seed the database with initial RSS sources.
+    
+    NOTE: Team-specific sources have been removed.
+    Users should add their own team feeds via the Sources UI or by setting SPORTS_TEAMS_JSON in .env.
+    This function now only seeds generic, location-agnostic sources.
+    """
     
     sources = [
-        # Boston Sports - The Athletic (now hosted on nytimes.com)
-        {"name": "The Athletic - Celtics", "url": "https://www.nytimes.com/athletic/rss/nba/celtics/", "category": "boston_sports"},
-        {"name": "The Athletic - Bruins", "url": "https://www.nytimes.com/athletic/rss/nhl/bruins/", "category": "boston_sports"},
-        {"name": "The Athletic - Patriots", "url": "https://www.nytimes.com/athletic/rss/nfl/patriots/", "category": "boston_sports"},
-        {"name": "The Athletic - Red Sox", "url": "https://www.nytimes.com/athletic/rss/mlb/redsox/", "category": "boston_sports"},
-        
-        # Other Teams - The Athletic
-        {"name": "The Athletic - Padres", "url": "https://www.nytimes.com/athletic/rss/mlb/padres/", "category": "other_teams"},
-        {"name": "The Athletic - Jazz", "url": "https://www.nytimes.com/athletic/rss/nba/jazz/", "category": "other_teams"},
-        {"name": "The Athletic - Syracuse", "url": "https://www.nytimes.com/athletic/rss/college-basketball/syracuse-orange-college-basketball/", "category": "other_teams"},
-        
-        # Backup Boston Sports sources (if Athletic doesn't work)
-        {"name": "Boston.com - Celtics", "url": "https://www.boston.com/tag/boston-celtics/feed/", "category": "boston_sports"},
-        {"name": "Boston.com - Bruins", "url": "https://www.boston.com/tag/boston-bruins/feed/", "category": "boston_sports"},
-        {"name": "Boston.com - Patriots", "url": "https://www.boston.com/tag/new-england-patriots/feed/", "category": "boston_sports"},
-        {"name": "Boston.com - Red Sox", "url": "https://www.boston.com/tag/boston-red-sox/feed/", "category": "boston_sports"},
-        
         # National News
         {"name": "NPR News", "url": "https://feeds.npr.org/1001/rss.xml", "category": "national_news"},
         {"name": "Google News World", "url": "https://news.google.com/rss/topics/CAAqJggKIiBDQkFTRWdvSUwyMHZNRGx1YlY4U0FtVnVHZ0pWVXlnQVAB", "category": "national_news"},
         
-        # Local News (Boston.com as Globe is broken)
-        {"name": "Boston.com News", "url": "https://www.boston.com/tag/local-news/feed/", "category": "local_news"},
-        
         # Long-form
         {"name": "Longreads", "url": "https://longreads.com/feed/", "category": "long_form"},
     ]
+
     
     from database import Category
     

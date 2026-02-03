@@ -5,9 +5,26 @@ Loads settings from environment variables with sensible defaults.
 import os
 import json
 from pathlib import Path
+import logging
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# Check for CRLF line endings in .env file (can cause API key issues)
+def _check_env_line_endings():
+    env_path = Path(__file__).resolve().parent.parent / ".env"
+    if env_path.exists():
+        content = env_path.read_bytes()
+        if b'\r\n' in content:
+            logging.warning(
+                "[CONFIG] WARNING: .env file has CRLF line endings! "
+                "This can cause API keys to be invalid. "
+                "Convert to LF line endings to fix."
+            )
+            return False
+    return True
+
+_ENV_LINE_ENDINGS_OK = _check_env_line_endings()
 
 # Paths
 BASE_DIR = Path(__file__).resolve().parent.parent

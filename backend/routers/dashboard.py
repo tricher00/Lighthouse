@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc
 
 from database import get_db, Article, Source, Category, WeatherData, SportsSchedule, TrafficAlert
+from config import LOCATION_NAME
 
 router = APIRouter(prefix="/api", tags=["dashboard"])
 
@@ -163,6 +164,7 @@ async def get_dashboard(
     total_unread = db.query(Article).filter(Article.is_read == False).count()
     
     return {
+        "location_name": LOCATION_NAME,
         "weather": weather_data,
         "traffic": traffic_data,
         "games": games_data,
