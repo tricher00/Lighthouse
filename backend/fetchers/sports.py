@@ -114,40 +114,47 @@ async def fetch_team_schedule(league: str, sport: str, team_id: str, team_name: 
 
 async def fetch_all_sports() -> int:
     """Fetch schedules for all configured teams."""
-    db = SessionLocal()
-    total_added = 0
-    
     # Get teams from user settings (or fallback to config)
     teams = get_active_teams()
     team_names = [t['name'] for t in teams]
     
+    if not teams:
+        logger.info("[SPORTS] No teams configured")
+        return 0
+    
+    # First, fetch all games BEFORE clearing (so we don't show empty state)
+    all_games = []
+    for team in teams:
+        games = await fetch_team_schedule(
+            team['league'], 
+            team['sport'], 
+            team['id'], 
+            team['name']
+        )
+        all_games.extend(games)
+        await asyncio.sleep(1) # Be nice to the API
+    
+    # Track ESPN IDs to prevent duplicates within the same batch
+    seen_espn_ids = set()
+    games_to_add = []
+    
+    for game_data in all_games:
+        espn_id = game_data.get('espn_id')
+        if espn_id in seen_espn_ids:
+            continue
+        seen_espn_ids.add(espn_id)
+        games_to_add.append(game_data)
+    
+    # Now do the database update in one transaction
+    db = SessionLocal()
+    total_added = 0
+    
     try:
-        # Clear ALL games for the teams we're fetching (not just future ones)
-        # This prevents duplicates when teams are changed
+        # Clear games for these teams and add new ones atomically
         if team_names:
             db.query(SportsSchedule).filter(SportsSchedule.team.in_(team_names)).delete(synchronize_session=False)
-            db.commit()
         
-        all_games = []
-        for team in teams:
-            games = await fetch_team_schedule(
-                team['league'], 
-                team['sport'], 
-                team['id'], 
-                team['name']
-            )
-            all_games.extend(games)
-            await asyncio.sleep(1) # Be nice to the API
-        
-        # Track ESPN IDs to prevent duplicates within the same batch
-        seen_espn_ids = set()
-        
-        for game_data in all_games:
-            espn_id = game_data.get('espn_id')
-            if espn_id in seen_espn_ids:
-                continue
-            seen_espn_ids.add(espn_id)
-            
+        for game_data in games_to_add:
             game = SportsSchedule(
                 team=game_data['team'],
                 opponent=game_data['opponent'],
@@ -156,7 +163,7 @@ async def fetch_all_sports() -> int:
                 broadcast=game_data['broadcast'],
                 is_home=game_data['is_home'],
                 league=game_data['league'],
-                espn_id=espn_id
+                espn_id=game_data.get('espn_id')
             )
             db.add(game)
             total_added += 1
