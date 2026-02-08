@@ -119,10 +119,14 @@ async def fetch_all_sports() -> int:
     
     # Get teams from user settings (or fallback to config)
     teams = get_active_teams()
+    team_names = [t['name'] for t in teams]
     
     try:
-        # Clear old future games to keep schedule fresh
-        db.query(SportsSchedule).filter(SportsSchedule.game_time > datetime.utcnow()).delete()
+        # Clear ALL games for the teams we're fetching (not just future ones)
+        # This prevents duplicates when teams are changed
+        if team_names:
+            db.query(SportsSchedule).filter(SportsSchedule.team.in_(team_names)).delete(synchronize_session=False)
+            db.commit()
         
         all_games = []
         for team in teams:
@@ -134,8 +138,16 @@ async def fetch_all_sports() -> int:
             )
             all_games.extend(games)
             await asyncio.sleep(1) # Be nice to the API
-            
+        
+        # Track ESPN IDs to prevent duplicates within the same batch
+        seen_espn_ids = set()
+        
         for game_data in all_games:
+            espn_id = game_data.get('espn_id')
+            if espn_id in seen_espn_ids:
+                continue
+            seen_espn_ids.add(espn_id)
+            
             game = SportsSchedule(
                 team=game_data['team'],
                 opponent=game_data['opponent'],
@@ -144,7 +156,7 @@ async def fetch_all_sports() -> int:
                 broadcast=game_data['broadcast'],
                 is_home=game_data['is_home'],
                 league=game_data['league'],
-                espn_id=game_data['espn_id']
+                espn_id=espn_id
             )
             db.add(game)
             total_added += 1

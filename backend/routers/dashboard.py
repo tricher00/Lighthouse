@@ -163,8 +163,13 @@ async def get_dashboard(
     # Count totals
     total_unread = db.query(Article).filter(Article.is_read == False).count()
     
+    # Get location name from UserSettings or fallback to config
+    from database import UserSettings
+    user_settings = db.query(UserSettings).first()
+    location_name = user_settings.location_name if user_settings and user_settings.location_name else LOCATION_NAME
+    
     return {
-        "location_name": LOCATION_NAME,
+        "location_name": location_name,
         "weather": weather_data,
         "traffic": traffic_data,
         "games": games_data,
