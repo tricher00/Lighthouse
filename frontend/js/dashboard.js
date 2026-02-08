@@ -821,7 +821,13 @@ async function saveSettings() {
         return;
     }
 
+    const saveBtn = document.querySelector('#settings-form .btn-primary');
+    const originalText = saveBtn.textContent;
+    saveBtn.textContent = 'Saving...';
+    saveBtn.disabled = true;
+
     try {
+        // 1. Save settings
         const response = await fetch(`${API_BASE}/api/settings`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
@@ -836,16 +842,28 @@ async function saveSettings() {
             })
         });
 
-        if (response.ok) {
-            alert('Settings saved! Weather will update automatically on the next refresh cycle (30 min) or restart the server.');
-            closeSourceManager();
-        } else {
+        if (!response.ok) {
             const error = await response.json();
-            alert(error.detail || 'Failed to save settings');
+            throw new Error(error.detail || 'Failed to save settings');
         }
+
+        // 2. Trigger data refresh
+        saveBtn.textContent = 'Refreshing data...';
+        await fetch(`${API_BASE}/api/settings/refresh`, { method: 'POST' });
+
+        // 3. Close modal and reload dashboard
+        closeSourceManager();
+        saveBtn.textContent = originalText;
+        saveBtn.disabled = false;
+
+        // Reload dashboard data
+        loadDashboard();
+
     } catch (err) {
         console.error('Failed to save settings:', err);
-        alert('Failed to save settings');
+        alert(err.message || 'Failed to save settings');
+        saveBtn.textContent = originalText;
+        saveBtn.disabled = false;
     }
 }
 

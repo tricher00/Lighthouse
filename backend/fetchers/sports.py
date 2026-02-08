@@ -9,10 +9,34 @@ import logging
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
 
-from database import SportsSchedule, SessionLocal
+from database import SportsSchedule, UserSettings, SessionLocal
 from config import SPORTS_TEAMS
 
 logger = logging.getLogger("lighthouse")
+
+
+def get_active_teams() -> List[Dict[str, Any]]:
+    """Get teams from UserSettings DB, falling back to config."""
+    db = SessionLocal()
+    try:
+        settings = db.query(UserSettings).first()
+        if settings and settings.sports_teams:
+            # Convert DB format to fetcher format
+            teams = []
+            for team in settings.sports_teams:
+                teams.append({
+                    'name': team.get('name', ''),
+                    'league': team.get('league', ''),
+                    'sport': team.get('sport', ''),
+                    'id': team.get('espn_id', team.get('id', ''))
+                })
+            if teams:
+                return teams
+    finally:
+        db.close()
+    
+    # Fallback to config
+    return SPORTS_TEAMS
 
 
 async def fetch_team_schedule(league: str, sport: str, team_id: str, team_name: str) -> List[Dict[str, Any]]:
@@ -93,12 +117,15 @@ async def fetch_all_sports() -> int:
     db = SessionLocal()
     total_added = 0
     
+    # Get teams from user settings (or fallback to config)
+    teams = get_active_teams()
+    
     try:
         # Clear old future games to keep schedule fresh
         db.query(SportsSchedule).filter(SportsSchedule.game_time > datetime.utcnow()).delete()
         
         all_games = []
-        for team in SPORTS_TEAMS:
+        for team in teams:
             games = await fetch_team_schedule(
                 team['league'], 
                 team['sport'], 

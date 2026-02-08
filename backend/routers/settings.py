@@ -92,6 +92,32 @@ async def update_settings(update: SettingsUpdate, db: Session = Depends(get_db))
     return {"success": True, "message": "Settings updated"}
 
 
+@router.post("/refresh")
+async def refresh_data():
+    """Trigger immediate refresh of weather and sports data."""
+    import asyncio
+    from fetchers.weather import fetch_and_save_weather
+    from fetchers.sports import fetch_all_sports
+    
+    results = {"weather": False, "sports": False}
+    
+    try:
+        # Fetch weather with new location
+        weather = await fetch_and_save_weather()
+        results["weather"] = weather is not None
+    except Exception as e:
+        print(f"Weather refresh error: {e}")
+    
+    try:
+        # Fetch sports with new teams
+        sports_count = await fetch_all_sports()
+        results["sports"] = sports_count > 0
+    except Exception as e:
+        print(f"Sports refresh error: {e}")
+    
+    return {"success": True, "refreshed": results}
+
+
 @router.get("/teams/search")
 async def search_teams(q: str):
     """Search for ESPN teams by name."""
