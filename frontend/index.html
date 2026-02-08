@@ -105,6 +105,7 @@
                 <button class="tab-btn active" data-tab="rss" onclick="switchSourceTab('rss')">📰 RSS Feeds</button>
                 <button class="tab-btn" data-tab="reddit" onclick="switchSourceTab('reddit')">💬 Reddit</button>
                 <button class="tab-btn" data-tab="settings" onclick="switchSourceTab('settings')">⚙️ Settings</button>
+                <button class="tab-btn" data-tab="reader" onclick="switchSourceTab('reader')">📖 Reader</button>
             </div>
             <div class="modal-body">
                 <!-- Add Source Form -->
@@ -170,9 +171,70 @@
                     <button class="btn btn-primary" onclick="saveSettings()" style="margin-top: 1rem; width: 100%;">Save
                         Settings</button>
                 </div>
+
+                <!-- Reader Settings Form -->
+                <div id="reader-settings-form" class="settings-form">
+                    <h3>Reader Mode Settings</h3>
+
+                    <div class="settings-group">
+                        <label>Theme</label>
+                        <select id="reader-theme">
+                            <option value="auto">Auto (match dashboard)</option>
+                            <option value="light">Light</option>
+                            <option value="dark">Dark</option>
+                        </select>
+                    </div>
+
+                    <div class="settings-group">
+                        <label>Cache Duration (hours)</label>
+                        <input type="number" id="reader-cache-hours" min="1" max="168" value="24">
+                        <small>Extracted content is cached for faster re-reading</small>
+                    </div>
+
+                    <h3>Blacklisted Sources</h3>
+                    <p class="settings-description">Sources that don't work well with Reader mode</p>
+                    <div id="reader-blacklist" class="reader-blacklist">
+                        <!-- Blacklisted sources will be rendered here -->
+                    </div>
+
+                    <button class="btn btn-primary" onclick="saveReaderSettings()"
+                        style="margin-top: 1rem; width: 100%;">Save Reader Settings</button>
+                </div>
             </div>
         </div>
     </div>
+
+    <!-- Reader Mode Modal -->
+    <div id="reader-modal" class="reader-modal">
+        <div class="reader-header">
+            <button class="reader-close-btn" onclick="closeReaderMode()" title="Close">✕</button>
+            <div class="reader-actions">
+                <button class="reader-action-btn" onclick="openOriginalUrl()" title="Open original article">🔗</button>
+                <button class="reader-action-btn" onclick="markAsFinished()" title="Mark as finished">✓ Done</button>
+            </div>
+        </div>
+        <div class="reader-content">
+            <article>
+                <h1 id="reader-title"></h1>
+                <div class="reader-meta" id="reader-meta"></div>
+                <div id="reader-body"></div>
+            </article>
+        </div>
+        <div class="reader-loading" id="reader-loading">
+            <div class="spinner"></div>
+            <p>Extracting article content...</p>
+        </div>
+        <div class="reader-error" id="reader-error">
+            <div class="error-icon">⚠️</div>
+            <p id="reader-error-message">Failed to extract article content</p>
+            <div class="reader-error-actions">
+                <button class="btn btn-secondary" onclick="blacklistCurrentSource()">🚫 Block this source from
+                    Reader</button>
+                <button class="btn btn-primary" onclick="openOriginalUrl()">🔗 Open original article</button>
+            </div>
+        </div>
+    </div>
+
 
     <footer>
         <div class="footer-stats">

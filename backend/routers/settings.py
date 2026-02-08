@@ -214,3 +214,86 @@ async def search_location(q: str):
         print(f"Location search error: {e}")
     
     return {"locations": []}
+
+
+# ============================================
+# Reader Mode Settings
+# ============================================
+
+class ReaderSettingsUpdate(BaseModel):
+    cache_hours: Optional[int] = None
+    theme: Optional[str] = None  # auto, light, dark
+
+
+@router.get("/reader")
+async def get_reader_settings(db: Session = Depends(get_db)):
+    """Get reader mode settings."""
+    settings = db.query(UserSettings).first()
+    
+    if not settings:
+        return {
+            "blacklisted_sources": [],
+            "cache_hours": 24,
+            "theme": "auto"
+        }
+    
+    return {
+        "blacklisted_sources": settings.reader_blacklisted_sources or [],
+        "cache_hours": settings.reader_cache_hours or 24,
+        "theme": settings.reader_theme or "auto"
+    }
+
+
+@router.put("/reader")
+async def update_reader_settings(update: ReaderSettingsUpdate, db: Session = Depends(get_db)):
+    """Update reader mode settings."""
+    settings = db.query(UserSettings).first()
+    
+    if not settings:
+        settings = UserSettings()
+        db.add(settings)
+    
+    if update.cache_hours is not None:
+        settings.reader_cache_hours = update.cache_hours
+    if update.theme is not None:
+        if update.theme not in ["auto", "light", "dark"]:
+            raise HTTPException(status_code=400, detail="Theme must be 'auto', 'light', or 'dark'")
+        settings.reader_theme = update.theme
+    
+    db.commit()
+    return {"success": True, "message": "Reader settings updated"}
+
+
+@router.post("/reader/blacklist/{source_id}")
+async def add_to_reader_blacklist(source_id: int, db: Session = Depends(get_db)):
+    """Add a source to the reader mode blacklist."""
+    settings = db.query(UserSettings).first()
+    
+    if not settings:
+        settings = UserSettings(reader_blacklisted_sources=[source_id])
+        db.add(settings)
+    else:
+        blacklist = settings.reader_blacklisted_sources or []
+        if source_id not in blacklist:
+            blacklist.append(source_id)
+            settings.reader_blacklisted_sources = blacklist
+    
+    db.commit()
+    return {"success": True, "message": f"Source {source_id} added to blacklist"}
+
+
+@router.delete("/reader/blacklist/{source_id}")
+async def remove_from_reader_blacklist(source_id: int, db: Session = Depends(get_db)):
+    """Remove a source from the reader mode blacklist."""
+    settings = db.query(UserSettings).first()
+    
+    if settings and settings.reader_blacklisted_sources:
+        blacklist = settings.reader_blacklisted_sources
+        if source_id in blacklist:
+            blacklist.remove(source_id)
+            settings.reader_blacklisted_sources = blacklist
+            db.commit()
+            return {"success": True, "message": f"Source {source_id} removed from blacklist"}
+    
+    return {"success": False, "message": f"Source {source_id} not in blacklist"}
+

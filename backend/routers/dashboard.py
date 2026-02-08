@@ -140,6 +140,8 @@ async def get_dashboard(
                 "summary_llm": a.summary_llm,
                 "thumbnail": a.thumbnail,
                 "source_name": a.source.name,
+                "source_id": a.source_id,
+                "source_type": a.source.type.value,
                 "published_at": a.published_at.isoformat() if a.published_at else None,
                 "is_read": a.is_read,
                 "rating": a.rating,

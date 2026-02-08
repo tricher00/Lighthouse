@@ -90,6 +90,7 @@ class Article(Base):
     summary = Column(Text, nullable=True)  # Raw snippet from source
     summary_llm = Column(Text, nullable=True)  # LLM-generated summary
     content = Column(Text, nullable=True)  # Full text for reader mode
+    content_extracted_at = Column(DateTime, nullable=True)  # When content was extracted
     thumbnail = Column(String(2048), nullable=True)
     
     # Timestamps
@@ -216,6 +217,11 @@ class UserSettings(Base):
     # Sports teams (stored as JSON array)
     sports_teams = Column(JSON, default=list)
     
+    # Reader mode settings
+    reader_blacklisted_sources = Column(JSON, default=list)  # List of source IDs
+    reader_cache_hours = Column(Integer, default=24)
+    reader_theme = Column(String(50), default="auto")  # auto, light, dark
+    
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     def __repr__(self):
@@ -245,8 +251,12 @@ def init_db():
     
     # Migrations
     add_column_if_missing('articles', 'summary_llm', 'TEXT')
+    add_column_if_missing('articles', 'content_extracted_at', 'DATETIME')
     add_column_if_missing('sports_schedules', 'espn_id', 'TEXT')
     add_column_if_missing('traffic_alerts', 'url', 'TEXT')
+    add_column_if_missing('user_settings', 'reader_blacklisted_sources', 'JSON')
+    add_column_if_missing('user_settings', 'reader_cache_hours', 'INTEGER')
+    add_column_if_missing('user_settings', 'reader_theme', 'TEXT')
     
     conn.commit()
     conn.close()

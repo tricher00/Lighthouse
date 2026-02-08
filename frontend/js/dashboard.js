@@ -5,10 +5,16 @@
 
 const API_BASE = '';
 let dashboardData = null;
+let readerSettings = {
+    blacklisted_sources: [],
+    cache_hours: 24,
+    theme: 'auto'
+};
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
     console.log('🗼 Lighthouse dashboard loaded');
+    loadReaderSettings(); // Load reader settings globally
     refreshDashboard();
 });
 
@@ -255,6 +261,13 @@ function renderArticleCard(article) {
                     ${article.author ? `<span class="author">By ${escapeHtml(article.author)}</span>` : ''}
                 </div>
                 <div class="article-actions" onclick="event.stopPropagation()">
+                    ${article.source_type !== 'reddit' ? `
+                        <button class="reader-btn ${isReaderDisabled(article.source_id) ? 'disabled' : ''}" 
+                                onclick="${isReaderDisabled(article.source_id) ? 'showBlacklistTooltip(this)' : `openReaderMode(${article.id})`}" 
+                                title="${isReaderDisabled(article.source_id) ? 'Reader mode disabled' : 'Open in Reader'}">
+                            📖
+                        </button>
+                    ` : ''}
                     <button class="mark-read-btn ${article.is_read ? 'active' : ''}" onclick="markAsRead(${article.id})" title="Mark as read">
                         ${article.is_read ? '✓' : '○'}
                     </button>
@@ -267,6 +280,13 @@ function renderArticleCard(article) {
         </article>
     `;
 }
+
+// Check if reader mode is disabled for a source
+function isReaderDisabled(sourceId) {
+    if (!readerSettings || !readerSettings.blacklisted_sources) return false;
+    return readerSettings.blacklisted_sources.includes(sourceId);
+}
+
 
 // Open article and mark as read
 async function openArticle(url, articleId) {
@@ -504,16 +524,25 @@ function switchSourceTab(tab) {
     const sourceList = document.getElementById('source-list');
     const addSourceForm = document.querySelector('.add-source-form');
     const settingsForm = document.getElementById('settings-form');
+    const readerSettingsForm = document.getElementById('reader-settings-form');
 
     if (tab === 'settings') {
         sourceList.style.display = 'none';
         addSourceForm.style.display = 'none';
         settingsForm.classList.add('active');
+        readerSettingsForm.classList.remove('active');
         loadSettings();
+    } else if (tab === 'reader') {
+        sourceList.style.display = 'none';
+        addSourceForm.style.display = 'none';
+        settingsForm.classList.remove('active');
+        readerSettingsForm.classList.add('active');
+        loadReaderSettings().then(() => renderReaderSettings());
     } else {
         sourceList.style.display = 'flex';
         addSourceForm.style.display = 'block';
         settingsForm.classList.remove('active');
+        readerSettingsForm.classList.remove('active');
         renderSourceList();
     }
 }
@@ -857,7 +886,7 @@ async function saveSettings() {
         saveBtn.disabled = false;
 
         // Reload dashboard data
-        loadDashboard();
+        refreshDashboard();
 
     } catch (err) {
         console.error('Failed to save settings:', err);
@@ -1027,4 +1056,269 @@ function selectLocation(location) {
     document.getElementById('setting-location-lon').value = location.lon;
     document.getElementById('location-search').value = '';
     document.getElementById('location-search-results').classList.remove('show');
+}
+
+// ============================================
+// Reader Mode Functions
+// ============================================
+
+let currentReaderArticle = null;
+
+async function openReaderMode(articleId) {
+    const modal = document.getElementById('reader-modal');
+    const loading = document.getElementById('reader-loading');
+    const content = document.querySelector('.reader-content');
+    const error = document.getElementById('reader-error');
+
+    // Show modal in loading state
+    modal.classList.add('open', 'loading');
+    modal.classList.remove('error');
+    document.body.classList.add('reader-open'); // Prevent background scrolling
+
+    // Clear previous content
+    document.getElementById('reader-title').textContent = '';
+    document.getElementById('reader-meta').innerHTML = '';
+    document.getElementById('reader-body').innerHTML = '';
+
+    // Find article in dashboardData to pre-populate currentReaderArticle
+    // This ensures buttons like "Open Original" work even if extraction fails
+    let articleData = null;
+    if (dashboardData && dashboardData.sections) {
+        for (const articles of Object.values(dashboardData.sections)) {
+            const found = articles.find(a => a.id === articleId);
+            if (found) {
+                articleData = found;
+                break;
+            }
+        }
+    }
+
+    if (articleData) {
+        currentReaderArticle = {
+            article_id: articleId,
+            url: articleData.url,
+            source_id: articleData.source_id,
+            title: articleData.title
+        };
+        // Note: Some fields like source_id might be missing in dashboard data, 
+        // we'll rely on the API content response to fill them in fully if successful.
+    } else {
+        currentReaderArticle = { article_id: articleId };
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/api/articles/${articleId}/content`);
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || `HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+        currentReaderArticle = data;
+
+        // Render content
+        document.getElementById('reader-title').textContent = data.title;
+
+        const extractedAt = new Date(data.extracted_at);
+        document.getElementById('reader-meta').innerHTML = `
+            ${data.author ? `<span>By ${escapeHtml(data.author)}</span> • ` : ''}
+            <span>Extracted ${getTimeAgo(extractedAt)}</span>
+        `;
+
+        document.getElementById('reader-body').innerHTML = data.content;
+
+        // Mark as read when opening in reader mode
+        markAsRead(articleId);
+
+        // Hide loading, show content
+        modal.classList.remove('loading');
+
+    } catch (err) {
+        console.error('Failed to load reader mode:', err);
+        document.getElementById('reader-error-message').textContent = `Extraction Error: ${err.message}`;
+        modal.classList.remove('loading');
+        modal.classList.add('error');
+    }
+}
+
+function closeReaderMode() {
+    const modal = document.getElementById('reader-modal');
+    modal.classList.remove('open', 'loading', 'error');
+    document.body.classList.remove('reader-open'); // Restore background scrolling
+    currentReaderArticle = null;
+}
+
+function openOriginalUrl() {
+    if (currentReaderArticle && currentReaderArticle.url) {
+        window.open(currentReaderArticle.url, '_blank');
+    }
+}
+
+async function markAsFinished() {
+    if (!currentReaderArticle) return;
+
+    const articleId = currentReaderArticle.article_id;
+
+    try {
+        // Clear cache and mark as read (if not already)
+        await fetch(`${API_BASE}/api/articles/${articleId}/clear-content`, { method: 'POST' });
+        closeReaderMode();
+        // Refresh dashboard would be too much, but we could update the card if cached
+    } catch (err) {
+        console.error('Failed to mark as finished:', err);
+        closeReaderMode();
+    }
+}
+
+async function blacklistCurrentSource() {
+    if (!currentReaderArticle) return;
+
+    const sourceId = currentReaderArticle.source_id;
+
+    try {
+        const response = await fetch(`${API_BASE}/api/settings/reader/blacklist/${sourceId}`, {
+            method: 'POST'
+        });
+
+        if (response.ok) {
+            // Update local settings and UI
+            if (!readerSettings.blacklisted_sources.includes(sourceId)) {
+                readerSettings.blacklisted_sources.push(sourceId);
+            }
+            closeReaderMode();
+            // Need to re-render article cards to show grayed out reader buttons
+            refreshDashboard();
+        }
+    } catch (err) {
+        console.error('Failed to blacklist source:', err);
+        alert('Failed to blacklist source');
+    }
+}
+
+function showBlacklistTooltip(btn) {
+    const originalText = btn.title;
+    btn.title = "⚠️ Reader mode is disabled for this source. Change this in Reader settings.";
+
+    // Reset after 3 seconds
+    setTimeout(() => {
+        btn.title = originalText;
+    }, 3000);
+}
+
+// ============================================
+// Reader Settings Functions
+// ============================================
+
+async function loadReaderSettings() {
+    try {
+        const response = await fetch(`${API_BASE}/api/settings/reader`);
+        if (response.ok) {
+            readerSettings = await response.json();
+            // Update global theme if set to something other than auto
+            applyReaderTheme();
+        }
+    } catch (err) {
+        console.error('Failed to load reader settings:', err);
+    }
+}
+
+function renderReaderSettings() {
+    document.getElementById('reader-theme').value = readerSettings.theme || 'auto';
+    document.getElementById('reader-cache-hours').value = readerSettings.cache_hours || 24;
+
+    renderBlacklist();
+}
+
+async function renderBlacklist() {
+    const container = document.getElementById('reader-blacklist');
+    const blacklist = readerSettings.blacklisted_sources || [];
+
+    if (blacklist.length === 0) {
+        container.innerHTML = '<div class="empty-state">No sources blacklisted</div>';
+        return;
+    }
+
+    // We need source names. If sourcesData is not loaded, load it.
+    if (sourcesData.length === 0) {
+        await loadSources();
+    }
+
+    container.innerHTML = blacklist.map(sourceId => {
+        const source = sourcesData.find(s => s.id === sourceId);
+        const name = source ? source.name : `Source #${sourceId}`;
+
+        return `
+            <div class="blacklist-item">
+                <span class="source-name">${escapeHtml(name)}</span>
+                <button class="unblock-btn" onclick="unblockSource(${sourceId})">Unblock</button>
+            </div>
+        `;
+    }).join('');
+}
+
+async function saveReaderSettings() {
+    const theme = document.getElementById('reader-theme').value;
+    const cache_hours = parseInt(document.getElementById('reader-cache-hours').value);
+
+    const saveBtn = document.querySelector('#reader-settings-form .btn-primary');
+    const originalText = saveBtn.textContent;
+    saveBtn.textContent = 'Saving...';
+    saveBtn.disabled = true;
+
+    try {
+        const response = await fetch(`${API_BASE}/api/settings/reader`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                theme,
+                cache_hours
+            })
+        });
+
+        if (response.ok) {
+            readerSettings.theme = theme;
+            readerSettings.cache_hours = cache_hours;
+            applyReaderTheme();
+            alert('Reader settings saved');
+        } else {
+            const error = await response.json();
+            alert(error.detail || 'Failed to save settings');
+        }
+    } catch (err) {
+        console.error('Failed to save reader settings:', err);
+        alert('Failed to save reader settings');
+    } finally {
+        saveBtn.textContent = originalText;
+        saveBtn.disabled = false;
+    }
+}
+
+async function unblockSource(sourceId) {
+    try {
+        const response = await fetch(`${API_BASE}/api/settings/reader/blacklist/${sourceId}`, {
+            method: 'DELETE'
+        });
+
+        if (response.ok) {
+            readerSettings.blacklisted_sources = readerSettings.blacklisted_sources.filter(id => id !== sourceId);
+            renderBlacklist();
+            // Refresh dashboard to enable reader buttons
+            refreshDashboard();
+        }
+    } catch (err) {
+        console.error('Failed to unblock source:', err);
+        alert('Failed to unblock source');
+    }
+}
+
+function applyReaderTheme() {
+    const theme = readerSettings.theme || 'auto';
+    const modal = document.getElementById('reader-modal');
+
+    if (!modal) return;
+
+    // If not auto, we might want to override some CSS variables for the modal
+    // But for now, let's keep it matching the dashboard as requested
+    // The CSS already handles the matching via var(--bg-primary) etc.
 }
