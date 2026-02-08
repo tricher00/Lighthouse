@@ -35,7 +35,7 @@ async def geocode_address(session: aiohttp.ClientSession, address: str) -> Optio
     params = {"key": TRAFFIC_API_KEY, "limit": 1}
     
     try:
-        async with session.get(url, params=params, ssl=False) as response:
+        async with session.get(url, params=params) as response:
             if response.status != 200:
                 err_text = await response.text()
                 logger.warning(f"[TRAFFIC] Geocoding error for {address}: {response.status} - {err_text[:100]}")
@@ -172,7 +172,7 @@ async def fetch_route_estimates(db: Session = None) -> tuple[int, List[str]]:
                 }
  
                 try:
-                    async with session.get(url, params=params, ssl=False) as response:
+                    async with session.get(url, params=params) as response:
                         if response.status != 200:
                             err_text = await response.text()
                             msg = f"TomTom API level error for {name}: {response.status}"

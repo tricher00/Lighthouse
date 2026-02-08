@@ -40,7 +40,7 @@ def fetch_reddit_job():
     """Job to fetch all Reddit sources."""
     logger.info("[CRON] Scheduled: Fetching Reddit posts...")
     from fetchers.reddit import fetch_all_reddit_sources
-    fetch_all_reddit_sources()
+    run_async(fetch_all_reddit_sources())
 
 
 def fetch_weather_job():

@@ -83,7 +83,7 @@ async def summarize_article(article: Article, db: Session) -> bool:
         return False
 
     # No need to summarize Reddit posts
-    if article.source == "Reddit":
+    if article.source.type.value == "reddit":
         return False
     
     if article.summary_llm:

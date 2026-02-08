@@ -212,7 +212,8 @@ function renderAllSections(sections) {
         'national_news': 'news',
         'local_news': 'local-news',
         'long_form': 'long-form',
-        'movies': 'movies'
+        'movies': 'movies',
+        'discovery': 'discovery'
     };
 
     // Combine articles for merged sections

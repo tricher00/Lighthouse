@@ -189,15 +189,10 @@ async def force_fetch_source(source_id: int, db: Session = Depends(get_db)):
     # Import fetchers
     if source.type == SourceType.RSS:
         from fetchers.rss import fetch_rss_source
-        import asyncio
-        new_count = asyncio.get_event_loop().run_until_complete(fetch_rss_source(source, db))
+        new_count = await fetch_rss_source(source, db)
     elif source.type == SourceType.REDDIT:
-        from fetchers.reddit import get_reddit_client, fetch_subreddit_posts
-        reddit = get_reddit_client()
-        if reddit:
-            new_count = fetch_subreddit_posts(reddit, source, db)
-        else:
-            raise HTTPException(status_code=500, detail="Reddit client not available")
+        from fetchers.reddit import fetch_subreddit_posts
+        new_count = await fetch_subreddit_posts(source, db)
     else:
         raise HTTPException(status_code=400, detail=f"Unknown source type: {source.type}")
     

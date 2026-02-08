@@ -193,20 +193,14 @@ async def serve_dashboard():
 
 @app.get("/reader")
 async def serve_reader():
-    """Serve the reader mode HTML."""
-    reader_path = FRONTEND_DIR / "reader.html"
-    if reader_path.exists():
-        return FileResponse(reader_path)
-    return {"error": "Reader page not found"}
+    """Serve the main app (reader is a modal)."""
+    return FileResponse(FRONTEND_DIR / "index.html")
 
 
 @app.get("/sources")
 async def serve_sources_page():
-    """Serve the source management HTML."""
-    sources_path = FRONTEND_DIR / "sources.html"
-    if sources_path.exists():
-        return FileResponse(sources_path)
-    return {"error": "Sources page not found"}
+    """Serve the main app (sources are managed in a modal)."""
+    return FileResponse(FRONTEND_DIR / "index.html")
 
 
 if __name__ == "__main__":
