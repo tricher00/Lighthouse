@@ -22,9 +22,9 @@
             <button id="refresh-btn" class="btn" onclick="refreshDashboard()">
                 <span>↻</span> Refresh
             </button>
-            <a href="/sources" class="btn">
+            <button class="btn" onclick="openSourceManager()">
                 <span>⚙</span> Sources
-            </a>
+            </button>
         </nav>
     </header>
 
@@ -101,6 +101,50 @@
             </div>
         </section>
     </main>
+
+    <!-- Source Manager Modal -->
+    <div id="source-modal" class="modal" onclick="closeSourceManagerOnBackdrop(event)">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Manage Sources</h2>
+                <button class="modal-close" onclick="closeSourceManager()">×</button>
+            </div>
+            <div class="modal-tabs">
+                <button class="tab-btn active" data-tab="rss" onclick="switchSourceTab('rss')">📰 RSS Feeds</button>
+                <button class="tab-btn" data-tab="reddit" onclick="switchSourceTab('reddit')">💬 Reddit</button>
+            </div>
+            <div class="modal-body">
+                <!-- Add Source Form -->
+                <div class="add-source-form">
+                    <div id="rss-form" class="source-form active">
+                        <input type="text" id="rss-name" placeholder="Feed name (e.g., TechCrunch)">
+                        <input type="url" id="rss-url" placeholder="RSS feed URL">
+                        <select id="rss-category">
+                            <option value="">Select category...</option>
+                        </select>
+                        <button class="btn btn-primary" onclick="addRssSource()">Add Feed</button>
+                    </div>
+                    <div id="reddit-form" class="source-form">
+                        <input type="text" id="reddit-subreddit" placeholder="Subreddit name (without r/)">
+                        <select id="reddit-sort">
+                            <option value="hot">Hot</option>
+                            <option value="top">Top (Today)</option>
+                            <option value="new">New</option>
+                        </select>
+                        <select id="reddit-category">
+                            <option value="">Select category...</option>
+                        </select>
+                        <button class="btn btn-primary" onclick="addRedditSource()">Add Subreddit</button>
+                    </div>
+                </div>
+                
+                <!-- Source List -->
+                <div id="source-list" class="source-list">
+                    <div class="loading">Loading sources...</div>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <footer>
         <div class="footer-stats">
