@@ -147,3 +147,44 @@ async def search_teams(q: str):
     matches = [t for t in all_teams if q_lower in t["name"].lower()]
     
     return {"teams": matches[:10]}
+
+
+@router.get("/location/search")
+async def search_location(q: str):
+    """Search for a city/location and return coordinates using Nominatim."""
+    import aiohttp
+    
+    if len(q) < 3:
+        return {"locations": []}
+    
+    try:
+        async with aiohttp.ClientSession() as session:
+            # Nominatim is free and doesn't require an API key
+            url = f"https://nominatim.openstreetmap.org/search"
+            params = {
+                "q": q,
+                "format": "json",
+                "limit": 5,
+                "addressdetails": 1
+            }
+            headers = {"User-Agent": "Lighthouse/1.0"}
+            
+            async with session.get(url, params=params, headers=headers) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    results = []
+                    for item in data:
+                        display = item.get("display_name", "").split(",")
+                        # Create a shorter display name
+                        short_name = ", ".join(display[:3]) if len(display) >= 3 else item.get("display_name", "")
+                        results.append({
+                            "name": short_name,
+                            "full_name": item.get("display_name", ""),
+                            "lat": float(item.get("lat", 0)),
+                            "lon": float(item.get("lon", 0))
+                        })
+                    return {"locations": results}
+    except Exception as e:
+        print(f"Location search error: {e}")
+    
+    return {"locations": []}

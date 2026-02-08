@@ -1074,7 +1074,8 @@ footer {
 }
 
 /* Team Search */
-.team-search-box {
+.team-search-box,
+.location-search-box {
     position: relative;
 }
 

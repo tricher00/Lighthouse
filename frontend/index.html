@@ -140,23 +140,19 @@
                 <div id="settings-form" class="settings-form">
                     <h3>Location</h3>
                     <div class="settings-group">
-                        <label>Location Name</label>
-                        <input type="text" id="setting-location-name" placeholder="e.g., New York, NY">
-                    </div>
-                    <div class="settings-row">
-                        <div class="settings-group">
-                            <label>Latitude</label>
-                            <input type="number" id="setting-location-lat" step="0.0001" placeholder="40.7128">
-                        </div>
-                        <div class="settings-group">
-                            <label>Longitude</label>
-                            <input type="number" id="setting-location-lon" step="0.0001" placeholder="-74.0060">
+                        <label>Search for your city</label>
+                        <div class="location-search-box">
+                            <input type="text" id="location-search" placeholder="Start typing a city name..."
+                                oninput="searchLocations()">
+                            <div id="location-search-results" class="search-results"></div>
                         </div>
                     </div>
                     <div class="settings-group">
-                        <label>NWS Zone Codes <a href="https://alerts.weather.gov/" target="_blank"
-                                class="help-link">(find yours)</a></label>
-                        <input type="text" id="setting-nws-zones" placeholder="e.g., NYZ072,NYZ073">
+                        <label>Selected Location</label>
+                        <input type="text" id="setting-location-name" readonly
+                            placeholder="Search and select a city above">
+                        <input type="hidden" id="setting-location-lat">
+                        <input type="hidden" id="setting-location-lon">
                     </div>
 
                     <h3>Sports Teams</h3>

@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import Optional, Dict, Any
 from sqlalchemy.orm import Session
 
-from database import WeatherData, SessionLocal
+from database import WeatherData, UserSettings, SessionLocal
 from config import LOCATION_LAT, LOCATION_LON, LOCATION_NAME
 
 logger = logging.getLogger("lighthouse")
@@ -18,6 +18,29 @@ logger = logging.getLogger("lighthouse")
 HEADERS = {
     'User-Agent': 'Lighthouse/1.0 (trich@example.com)'
 }
+
+
+def get_active_location() -> Dict[str, Any]:
+    """Get location from UserSettings DB, falling back to config env vars."""
+    db = SessionLocal()
+    try:
+        settings = db.query(UserSettings).first()
+        if settings and settings.location_lat and settings.location_lon:
+            return {
+                'lat': settings.location_lat,
+                'lon': settings.location_lon,
+                'name': settings.location_name or LOCATION_NAME
+            }
+    finally:
+        db.close()
+    
+    # Fallback to config
+    return {
+        'lat': LOCATION_LAT,
+        'lon': LOCATION_LON,
+        'name': LOCATION_NAME
+    }
+
 
 def get_dress_suggestion(temp: float, conditions: str) -> str:
     """Generate a dress suggestion based on temperature and conditions."""
@@ -66,10 +89,16 @@ async def fetch_nws_data(url: str) -> Optional[Dict[str, Any]]:
 
 async def fetch_weather() -> Optional[Dict[str, Any]]:
     """Fetch current weather from National Weather Service."""
-    logger.info(f"[WEATHER] Fetching NWS weather for {LOCATION_NAME}...")
+    # Get location from DB settings or fallback to config
+    location = get_active_location()
+    lat = location['lat']
+    lon = location['lon']
+    name = location['name']
+    
+    logger.info(f"[WEATHER] Fetching NWS weather for {name}...")
     
     # 1. Get the points meta-data to find the forecast office and station
-    points_url = f"https://api.weather.gov/points/{LOCATION_LAT},{LOCATION_LON}"
+    points_url = f"https://api.weather.gov/points/{lat},{lon}"
     points_data = await fetch_nws_data(points_url)
     if not points_data:
         return None

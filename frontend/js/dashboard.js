@@ -780,7 +780,7 @@ function renderSettings() {
     document.getElementById('setting-location-name').value = settingsData.location?.name || '';
     document.getElementById('setting-location-lat').value = settingsData.location?.lat || '';
     document.getElementById('setting-location-lon').value = settingsData.location?.lon || '';
-    document.getElementById('setting-nws-zones').value = settingsData.location?.nws_zone_codes || '';
+    document.getElementById('location-search').value = '';
 
     renderMyTeamsList();
 }
@@ -815,7 +815,11 @@ async function saveSettings() {
     const locationName = document.getElementById('setting-location-name').value.trim();
     const locationLat = parseFloat(document.getElementById('setting-location-lat').value) || 0;
     const locationLon = parseFloat(document.getElementById('setting-location-lon').value) || 0;
-    const nwsZones = document.getElementById('setting-nws-zones').value.trim();
+
+    if (!locationName || (!locationLat && !locationLon)) {
+        alert('Please search and select a location first');
+        return;
+    }
 
     try {
         const response = await fetch(`${API_BASE}/api/settings`, {
@@ -826,14 +830,15 @@ async function saveSettings() {
                     location_name: locationName,
                     location_lat: locationLat,
                     location_lon: locationLon,
-                    nws_zone_codes: nwsZones
+                    nws_zone_codes: ''
                 },
                 sports_teams: settingsData.sports_teams
             })
         });
 
         if (response.ok) {
-            alert('Settings saved! Refresh the page to see weather/traffic updates.');
+            alert('Settings saved! Weather will update automatically on the next refresh cycle (30 min) or restart the server.');
+            closeSourceManager();
         } else {
             const error = await response.json();
             alert(error.detail || 'Failed to save settings');
@@ -930,9 +935,78 @@ function removeTeam(index) {
 
 // Close search results when clicking outside
 document.addEventListener('click', (e) => {
-    const searchBox = document.querySelector('.team-search-box');
-    const resultsContainer = document.getElementById('team-search-results');
-    if (searchBox && resultsContainer && !searchBox.contains(e.target)) {
-        resultsContainer.classList.remove('show');
+    // Team search dropdown
+    const teamSearchBox = document.querySelector('.team-search-box');
+    const teamResults = document.getElementById('team-search-results');
+    if (teamSearchBox && teamResults && !teamSearchBox.contains(e.target)) {
+        teamResults.classList.remove('show');
+    }
+
+    // Location search dropdown
+    const locationSearchBox = document.querySelector('.location-search-box');
+    const locationResults = document.getElementById('location-search-results');
+    if (locationSearchBox && locationResults && !locationSearchBox.contains(e.target)) {
+        locationResults.classList.remove('show');
     }
 });
+
+// ============================================
+// Location Search Functions
+// ============================================
+
+let locationSearchTimer = null;
+
+// Search for locations (debounced)
+function searchLocations() {
+    const query = document.getElementById('location-search').value.trim();
+    const resultsContainer = document.getElementById('location-search-results');
+
+    if (locationSearchTimer) {
+        clearTimeout(locationSearchTimer);
+    }
+
+    if (query.length < 3) {
+        resultsContainer.classList.remove('show');
+        return;
+    }
+
+    locationSearchTimer = setTimeout(async () => {
+        try {
+            const response = await fetch(`${API_BASE}/api/settings/location/search?q=${encodeURIComponent(query)}`);
+            if (response.ok) {
+                const data = await response.json();
+                renderLocationResults(data.locations || []);
+            }
+        } catch (err) {
+            console.error('Failed to search locations:', err);
+        }
+    }, 400);
+}
+
+// Render location search results
+function renderLocationResults(locations) {
+    const resultsContainer = document.getElementById('location-search-results');
+
+    if (locations.length === 0) {
+        resultsContainer.innerHTML = '<div class="search-result-item"><span>No locations found</span></div>';
+        resultsContainer.classList.add('show');
+        return;
+    }
+
+    resultsContainer.innerHTML = locations.map(loc => `
+        <div class="search-result-item" onclick='selectLocation(${JSON.stringify(loc)})'>
+            <span class="team-name">${escapeHtml(loc.name)}</span>
+        </div>
+    `).join('');
+
+    resultsContainer.classList.add('show');
+}
+
+// Select a location from the dropdown
+function selectLocation(location) {
+    document.getElementById('setting-location-name').value = location.name;
+    document.getElementById('setting-location-lat').value = location.lat;
+    document.getElementById('setting-location-lon').value = location.lon;
+    document.getElementById('location-search').value = '';
+    document.getElementById('location-search-results').classList.remove('show');
+}
