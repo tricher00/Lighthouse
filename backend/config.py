@@ -74,6 +74,13 @@ FETCH_INTERVAL_WEATHER = 30 * 60    # 30 minutes
 FETCH_INTERVAL_TRAFFIC = 15 * 60    # 15 minutes
 FETCH_INTERVAL_SPORTS = 24 * 60 * 60  # Daily
 
+# Traffic Estimates (TomTom)
+TRAFFIC_API_PROVIDER = os.getenv("TRAFFIC_API_PROVIDER", "tomtom")
+TRAFFIC_API_KEY = os.getenv("TRAFFIC_API_KEY", "")
+# Format: [{"name": "Work", "origin": "40.7128,-74.0060", "destination": "40.7306,-73.9352"}]
+TRAFFIC_ROUTES_JSON = os.getenv("TRAFFIC_ROUTES_JSON", "[]")
+TRAFFIC_ROUTES_CONFIG = json.loads(TRAFFIC_ROUTES_JSON) if TRAFFIC_ROUTES_JSON else []
+
 # LLM Settings
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "groq")  # groq or gemini
 LLM_SUMMARY_ENABLED = os.getenv("LLM_SUMMARY_ENABLED", "True").lower() == "true"

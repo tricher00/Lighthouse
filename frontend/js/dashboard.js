@@ -40,7 +40,8 @@ async function refreshDashboard() {
 
     } catch (err) {
         console.error('❌ Failed to load dashboard:', err);
-        showError('Failed to connect to Lighthouse backend. Is it running?');
+        console.error('Stack trace:', err.stack);
+        showError(`Failed to connect to Lighthouse backend. Error: ${err.message}`);
     }
 }
 
@@ -99,22 +100,35 @@ function renderWeather(weather, locationName) {
 }
 
 // Render traffic card
-function renderTraffic(alerts, locationName) {
+function renderTraffic(trafficData, locationName) {
     const card = document.getElementById('traffic-card');
 
-    if (!alerts || alerts.length === 0) {
-        card.innerHTML = `
-            <div class="card-header">
-                <span class="card-title">Traffic</span>
-                <span class="card-meta">${escapeHtml(locationName)}</span>
-            </div>
-            <div class="no-alerts">
-                <span>✅</span>
-                <span>No traffic alerts</span>
-            </div>
-        `;
+    if (!trafficData || ((!trafficData.alerts || trafficData.alerts.length === 0) && (!trafficData.routes || trafficData.routes.length === 0))) {
+        card.style.display = 'none';
         return;
     }
+    card.style.display = 'block';
+
+    const alerts = trafficData.alerts || [];
+    const routes = trafficData.routes || [];
+
+    const routesHtml = routes.map(route => {
+        let statusClass = 'status-green';
+        if (route.delay >= 10) statusClass = 'status-red';
+        else if (route.delay >= 5) statusClass = 'status-yellow';
+
+        return `
+            <div class="traffic-route ${statusClass}">
+                <div class="route-info">
+                    <span class="route-name">${escapeHtml(route.name)}</span>
+                    <span class="route-time">${route.current_duration} min</span>
+                </div>
+                <div class="route-delay">
+                    ${route.delay > 0 ? `+${route.delay} min delay` : 'No delay'}
+                </div>
+            </div>
+        `;
+    }).join('');
 
     const alertsHtml = alerts.map(alert => `
         <div class="alert ${alert.severity}">
@@ -130,9 +144,12 @@ function renderTraffic(alerts, locationName) {
     card.innerHTML = `
         <div class="card-header">
             <span class="card-title">Traffic</span>
-            <span class="card-meta">${alerts.length} alert(s)</span>
+            <span class="card-meta">${routes.length > 0 ? `${routes.length} route(s)` : `${alerts.length} alert(s)`}</span>
         </div>
-        ${alertsHtml}
+        <div class="traffic-content">
+            ${routes.length > 0 ? `<div class="traffic-routes">${routesHtml}</div>` : ''}
+            ${alerts.length > 0 ? `<div class="traffic-alerts">${alertsHtml}</div>` : ''}
+        </div>
     `;
 }
 
@@ -775,7 +792,8 @@ async function deleteSource(sourceId, sourceName) {
 
 let settingsData = {
     location: { name: '', lat: 0, lon: 0, nws_zone_codes: '' },
-    sports_teams: []
+    sports_teams: [],
+    traffic_routes: []
 };
 let searchDebounceTimer = null;
 
@@ -812,6 +830,7 @@ function renderSettings() {
     document.getElementById('location-search').value = '';
 
     renderMyTeamsList();
+    renderTrafficRoutesList();
 }
 
 // Render the list of selected teams
@@ -837,6 +856,91 @@ function renderMyTeamsList() {
             <button class="remove-team-btn" onclick="removeTeam(${index})" title="Remove team">✕</button>
         </div>
     `).join('');
+}
+
+// Render the list of traffic routes
+function renderTrafficRoutesList() {
+    const container = document.getElementById('my-routes-list');
+    const routes = settingsData.traffic_routes || [];
+
+    if (routes.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <p>No custom routes. Environment defaults will be used.</p>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = routes.map((route, index) => `
+        <div class="my-route-item" data-index="${index}">
+            <div class="route-info">
+                <span class="route-name">${escapeHtml(route.name)}</span>
+                <span class="route-path">${escapeHtml(route.origin)} → ${escapeHtml(route.destination)}</span>
+            </div>
+            <div class="route-actions">
+                <button class="reverse-route-btn" onclick="reverseTrafficRoute(${index})" title="Add reverse route">🔃</button>
+                <button class="remove-route-btn" onclick="removeTrafficRoute(${index})" title="Remove route">✕</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+// Reverse a traffic route
+function reverseTrafficRoute(index) {
+    const route = settingsData.traffic_routes[index];
+    if (!route) return;
+
+    // Check if reverse already exists
+    const reverseName = `${route.name} (Return)`;
+    const alreadyExists = settingsData.traffic_routes.find(r => r.name === reverseName || (r.origin === route.destination && r.destination === route.origin));
+
+    if (alreadyExists) {
+        alert('A reverse route already exists.');
+        return;
+    }
+
+    settingsData.traffic_routes.push({
+        name: reverseName,
+        origin: route.destination,
+        destination: route.origin
+    });
+
+    renderTrafficRoutesList();
+}
+
+// Add a traffic route
+function addTrafficRoute() {
+    const name = document.getElementById('new-route-name').value.trim();
+    const origin = document.getElementById('new-route-origin').value.trim();
+    const dest = document.getElementById('new-route-dest').value.trim();
+
+    if (!name || !origin || !dest) {
+        alert('Please fill in Name, Origin, and Destination');
+        return;
+    }
+
+    if (!settingsData.traffic_routes) {
+        settingsData.traffic_routes = [];
+    }
+
+    settingsData.traffic_routes.push({
+        name: name,
+        origin: origin,
+        destination: dest
+    });
+
+    // Clear and re-render
+    document.getElementById('new-route-name').value = '';
+    document.getElementById('new-route-origin').value = '';
+    document.getElementById('new-route-dest').value = '';
+    renderTrafficRoutesList();
+}
+
+// Remove a traffic route
+function removeTrafficRoute(index) {
+    settingsData.traffic_routes.splice(index, 1);
+    renderTrafficRoutesList();
 }
 
 // Save settings to API
@@ -867,7 +971,8 @@ async function saveSettings() {
                     location_lon: locationLon,
                     nws_zone_codes: ''
                 },
-                sports_teams: settingsData.sports_teams
+                sports_teams: settingsData.sports_teams,
+                traffic_routes: settingsData.traffic_routes
             })
         });
 
@@ -878,7 +983,17 @@ async function saveSettings() {
 
         // 2. Trigger data refresh
         saveBtn.textContent = 'Refreshing data...';
-        await fetch(`${API_BASE}/api/settings/refresh`, { method: 'POST' });
+        const refreshResponse = await fetch(`${API_BASE}/api/settings/refresh`, { method: 'POST' });
+        const refreshData = await refreshResponse.json();
+
+        if (refreshData.refreshed && refreshData.refreshed.traffic === false) {
+            const trafficErrors = refreshData.errors?.traffic || [];
+            if (trafficErrors.length > 0) {
+                alert('Traffic refresh issues:\n' + trafficErrors.join('\n'));
+            } else {
+                console.warn('Traffic refresh had issues. Check logs if routes are missing.');
+            }
+        }
 
         // 3. Close modal and reload dashboard
         closeSourceManager();

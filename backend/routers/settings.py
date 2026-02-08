@@ -26,9 +26,16 @@ class SportsTeam(BaseModel):
     espn_id: str
 
 
+class TrafficRouteUpdate(BaseModel):
+    name: str
+    origin: str  # Address or lat,lon
+    destination: str  # Address or lat,lon
+
+
 class SettingsUpdate(BaseModel):
     location: Optional[LocationSettings] = None
     sports_teams: Optional[List[SportsTeam]] = None
+    traffic_routes: Optional[List[TrafficRouteUpdate]] = None
 
 
 @router.get("")
@@ -56,7 +63,8 @@ async def get_settings(db: Session = Depends(get_db)):
             "lon": settings.location_lon,
             "nws_zone_codes": settings.nws_zone_codes
         },
-        "sports_teams": settings.sports_teams or []
+        "sports_teams": settings.sports_teams or [],
+        "traffic_routes": settings.traffic_routes or []
     }
 
 
@@ -86,6 +94,9 @@ async def update_settings(update: SettingsUpdate, db: Session = Depends(get_db))
     if update.sports_teams is not None:
         settings.sports_teams = [t.model_dump() for t in update.sports_teams]
     
+    if update.traffic_routes is not None:
+        settings.traffic_routes = [r.model_dump() for r in update.traffic_routes]
+    
     db.commit()
     db.refresh(settings)
     
@@ -98,8 +109,9 @@ async def refresh_data():
     import asyncio
     from fetchers.weather import fetch_and_save_weather
     from fetchers.sports import fetch_all_sports
+    from fetchers.traffic import fetch_traffic_alerts
     
-    results = {"weather": False, "sports": False}
+    results = {"weather": False, "sports": False, "traffic": False}
     
     try:
         # Fetch weather with new location
@@ -114,8 +126,23 @@ async def refresh_data():
         results["sports"] = sports_count > 0
     except Exception as e:
         print(f"Sports refresh error: {e}")
+
+    traffic_errors = []
+    try:
+        # Fetch traffic with new routes or location
+        traffic_count, traffic_errors = await fetch_traffic_alerts()
+        results["traffic"] = traffic_count >= 0
+    except Exception as e:
+        print(f"Traffic refresh error: {e}")
+        traffic_errors.append(str(e))
     
-    return {"success": True, "refreshed": results}
+    return {
+        "success": True, 
+        "refreshed": results,
+        "errors": {
+            "traffic": traffic_errors
+        }
+    }
 
 
 @router.get("/teams/search")

@@ -137,7 +137,7 @@ class SportsSchedule(Base):
 
 
 class TrafficAlert(Base):
-    """Traffic alerts for monitored routes."""
+    """Traffic alerts for monitored routes (e.g., NWS weather alerts)."""
     __tablename__ = "traffic_alerts"
     
     id = Column(Integer, primary_key=True, index=True)
@@ -153,6 +153,29 @@ class TrafficAlert(Base):
     
     def __repr__(self):
         return f"<TrafficAlert {self.route}: {self.alert_type}>"
+
+
+class TrafficRoute(Base):
+    """Real-time traffic estimates for specific routes."""
+    __tablename__ = "traffic_routes"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False)
+    origin = Column(String(255), nullable=False)
+    destination = Column(String(255), nullable=False)
+    origin_lat = Column(Float, nullable=True)
+    origin_lon = Column(Float, nullable=True)
+    dest_lat = Column(Float, nullable=True)
+    dest_lon = Column(Float, nullable=True)
+    origin_zone = Column(String(50), nullable=True)
+    dest_zone = Column(String(50), nullable=True)
+    current_duration_minutes = Column(Integer, nullable=True)
+    typical_duration_minutes = Column(Integer, nullable=True)
+    delay_minutes = Column(Integer, nullable=True)
+    fetched_at = Column(DateTime, default=datetime.utcnow)
+    
+    def __repr__(self):
+        return f"<TrafficRoute {self.name}: {self.delay_minutes}min delay>"
 
 
 class WeatherData(Base):
@@ -217,6 +240,9 @@ class UserSettings(Base):
     # Sports teams (stored as JSON array)
     sports_teams = Column(JSON, default=list)
     
+    # Traffic routes (stored as JSON array)
+    traffic_routes = Column(JSON, default=list)
+    
     # Reader mode settings
     reader_blacklisted_sources = Column(JSON, default=list)  # List of source IDs
     reader_cache_hours = Column(Integer, default=24)
@@ -257,6 +283,38 @@ def init_db():
     add_column_if_missing('user_settings', 'reader_blacklisted_sources', 'JSON')
     add_column_if_missing('user_settings', 'reader_cache_hours', 'INTEGER')
     add_column_if_missing('user_settings', 'reader_theme', 'TEXT')
+    add_column_if_missing('user_settings', 'traffic_routes', 'JSON')
+    
+    # TrafficRoute migrations
+    add_column_if_missing('traffic_routes', 'origin_lat', 'FLOAT')
+    add_column_if_missing('traffic_routes', 'origin_lon', 'FLOAT')
+    add_column_if_missing('traffic_routes', 'dest_lat', 'FLOAT')
+    add_column_if_missing('traffic_routes', 'dest_lon', 'FLOAT')
+    add_column_if_missing('traffic_routes', 'origin_zone', 'TEXT')
+    add_column_if_missing('traffic_routes', 'dest_zone', 'TEXT')
+    
+    # Ensure traffic_routes table exists
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='traffic_routes'")
+    if not cursor.fetchone():
+        cursor.execute('''
+            CREATE TABLE traffic_routes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                origin TEXT NOT NULL,
+                destination TEXT NOT NULL,
+                origin_lat FLOAT,
+                origin_lon FLOAT,
+                dest_lat FLOAT,
+                dest_lon FLOAT,
+                origin_zone TEXT,
+                dest_zone TEXT,
+                current_duration_minutes INTEGER,
+                typical_duration_minutes INTEGER,
+                delay_minutes INTEGER,
+                fetched_at DATETIME
+            )
+        ''')
+        logger.info("[MIGRATE] Created traffic_routes table")
     
     conn.commit()
     conn.close()

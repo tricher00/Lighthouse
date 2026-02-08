@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 
-from database import get_db, Article, Source, Category, WeatherData, SportsSchedule, TrafficAlert
+from database import get_db, Article, Source, Category, WeatherData, SportsSchedule, TrafficAlert, TrafficRoute
 from config import LOCATION_NAME
 
 router = APIRouter(prefix="/api", tags=["dashboard"])
@@ -41,23 +41,38 @@ async def get_dashboard(
             "fetched_at": weather.fetched_at.isoformat() if weather.fetched_at else None
         }
     
-    # Get traffic alerts
+    # Get traffic alerts and route estimates
     traffic_alerts = db.query(TrafficAlert).filter(
         TrafficAlert.expires_at > datetime.utcnow()
     ).order_by(desc(TrafficAlert.reported_at)).limit(5).all()
     
-    traffic_data = [
-        {
-            "id": alert.id,
-            "route": alert.route,
-            "type": alert.alert_type,
-            "description": alert.description,
-            "severity": alert.severity,
-            "location": alert.location,
-            "url": alert.url
-        }
-        for alert in traffic_alerts
-    ]
+    route_estimates = db.query(TrafficRoute).order_by(TrafficRoute.name).all()
+    
+    traffic_data = {
+        "alerts": [
+            {
+                "id": alert.id,
+                "route": alert.route,
+                "type": alert.alert_type,
+                "description": alert.description,
+                "severity": alert.severity,
+                "location": alert.location,
+                "url": alert.url
+            }
+            for alert in traffic_alerts
+        ],
+        "routes": [
+            {
+                "id": route.id,
+                "name": route.name,
+                "current_duration": route.current_duration_minutes,
+                "typical_duration": route.typical_duration_minutes,
+                "delay": route.delay_minutes,
+                "fetched_at": route.fetched_at.isoformat() if route.fetched_at else None
+            }
+            for route in route_estimates
+        ]
+    }
     
     # Get upcoming games
     upcoming_games = db.query(SportsSchedule).filter(

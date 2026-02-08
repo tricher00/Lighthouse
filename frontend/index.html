@@ -168,6 +168,20 @@
                         <!-- Teams will be rendered here -->
                     </div>
 
+                    <h3>Commute Routes</h3>
+                    <div class="settings-group">
+                        <label>Add a new route (Address or coordinates)</label>
+                        <div class="route-add-form">
+                            <input type="text" id="new-route-name" placeholder="Name (e.g. Home to Work)">
+                            <input type="text" id="new-route-origin" placeholder="Origin (e.g. 123 Main St)">
+                            <input type="text" id="new-route-dest" placeholder="Destination (e.g. Work Address)">
+                            <button class="btn btn-secondary" onclick="addTrafficRoute()">Add Route</button>
+                        </div>
+                    </div>
+                    <div id="my-routes-list" class="my-routes-list">
+                        <!-- Routes will be rendered here -->
+                    </div>
+
                     <button class="btn btn-primary" onclick="saveSettings()" style="margin-top: 1rem; width: 100%;">Save
                         Settings</button>
                 </div>
