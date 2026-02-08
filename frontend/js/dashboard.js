@@ -180,9 +180,11 @@ function renderGames(games) {
 function renderAllSections(sections) {
     if (!sections) return;
 
+    // Map API categories to HTML section IDs
+    // boston_sports and other_teams both go to 'sports' section
     const categoryMap = {
-        'boston_sports': 'boston-sports',
-        'other_teams': 'other-teams',
+        'boston_sports': 'sports',
+        'other_teams': 'sports',
         'league_wide': 'league-wide',
         'national_news': 'news',
         'local_news': 'local-news',
@@ -190,17 +192,24 @@ function renderAllSections(sections) {
         'movies': 'movies'
     };
 
-    for (const [category, articles] of Object.entries(sections)) {
-        try {
-            const sectionId = categoryMap[category];
-            if (!sectionId) {
-                console.log(`ℹ️ Skipping category ${category} (no ID mapping)`);
-                continue;
-            }
+    // Combine articles for merged sections
+    const combinedSections = {};
 
+    for (const [category, articles] of Object.entries(sections)) {
+        const sectionId = categoryMap[category];
+        if (!sectionId) continue;
+
+        if (!combinedSections[sectionId]) {
+            combinedSections[sectionId] = [];
+        }
+        combinedSections[sectionId].push(...(articles || []));
+    }
+
+    for (const [sectionId, articles] of Object.entries(combinedSections)) {
+        try {
             const section = document.getElementById(sectionId);
             if (!section) {
-                console.warn(`⚠️ Section element not found: ${sectionId}`);
+                console.warn(`Section not found: ${sectionId}`);
                 continue;
             }
 
@@ -478,7 +487,7 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-// Switch between RSS and Reddit tabs
+// Switch between RSS, Reddit, and Settings tabs
 function switchSourceTab(tab) {
     currentSourceTab = tab;
 
@@ -487,12 +496,26 @@ function switchSourceTab(tab) {
         btn.classList.toggle('active', btn.dataset.tab === tab);
     });
 
-    // Update forms
+    // Update forms visibility
     document.getElementById('rss-form').classList.toggle('active', tab === 'rss');
     document.getElementById('reddit-form').classList.toggle('active', tab === 'reddit');
 
-    // Re-render source list with filter
-    renderSourceList();
+    // Show/hide source list and settings
+    const sourceList = document.getElementById('source-list');
+    const addSourceForm = document.querySelector('.add-source-form');
+    const settingsForm = document.getElementById('settings-form');
+
+    if (tab === 'settings') {
+        sourceList.style.display = 'none';
+        addSourceForm.style.display = 'none';
+        settingsForm.classList.add('active');
+        loadSettings();
+    } else {
+        sourceList.style.display = 'flex';
+        addSourceForm.style.display = 'block';
+        settingsForm.classList.remove('active');
+        renderSourceList();
+    }
 }
 
 // Load categories from API
@@ -509,14 +532,18 @@ async function loadCategories() {
     }
 }
 
-// Populate category dropdowns
+// Populate category dropdowns (uses categoryDisplayNames from settings if available)
 function populateCategoryDropdowns() {
     const rssSelect = document.getElementById('rss-category');
     const redditSelect = document.getElementById('reddit-category');
 
-    const optionsHtml = categoriesData.map(cat =>
-        `<option value="${cat.value}">${cat.name}</option>`
-    ).join('');
+    // categoryDisplayNames is defined in settings section
+    const displayNames = typeof categoryDisplayNames !== 'undefined' ? categoryDisplayNames : {};
+
+    const optionsHtml = categoriesData.map(cat => {
+        const displayName = displayNames[cat.value] || cat.name;
+        return `<option value="${cat.value}">${displayName}</option>`;
+    }).join('');
 
     rssSelect.innerHTML = `<option value="">Select category...</option>${optionsHtml}`;
     redditSelect.innerHTML = `<option value="">Select category...</option>${optionsHtml}`;
@@ -712,3 +739,200 @@ async function deleteSource(sourceId, sourceName) {
         alert('Failed to delete source');
     }
 }
+
+// ============================================
+// Settings Functions
+// ============================================
+
+let settingsData = {
+    location: { name: '', lat: 0, lon: 0, nws_zone_codes: '' },
+    sports_teams: []
+};
+let searchDebounceTimer = null;
+
+// Category display names (maps internal names to user-friendly names)
+const categoryDisplayNames = {
+    'boston_sports': 'My Teams',
+    'other_teams': 'Other Sports',
+    'league_wide': 'League News',
+    'national_news': 'News',
+    'local_news': 'Local',
+    'long_form': 'Long Form',
+    'movies': 'Movies',
+    'discovery': 'Discovery'
+};
+
+// Load settings from API
+async function loadSettings() {
+    try {
+        const response = await fetch(`${API_BASE}/api/settings`);
+        if (response.ok) {
+            settingsData = await response.json();
+            renderSettings();
+        }
+    } catch (err) {
+        console.error('Failed to load settings:', err);
+    }
+}
+
+// Render settings form with current values
+function renderSettings() {
+    document.getElementById('setting-location-name').value = settingsData.location?.name || '';
+    document.getElementById('setting-location-lat').value = settingsData.location?.lat || '';
+    document.getElementById('setting-location-lon').value = settingsData.location?.lon || '';
+    document.getElementById('setting-nws-zones').value = settingsData.location?.nws_zone_codes || '';
+
+    renderMyTeamsList();
+}
+
+// Render the list of selected teams
+function renderMyTeamsList() {
+    const container = document.getElementById('my-teams-list');
+    const teams = settingsData.sports_teams || [];
+
+    if (teams.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <p>No teams selected. Search above to add teams.</p>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = teams.map((team, index) => `
+        <div class="my-team-item" data-index="${index}">
+            <div class="team-info">
+                <span class="team-name">${escapeHtml(team.name)}</span>
+                <span class="team-league">${team.league}</span>
+            </div>
+            <button class="remove-team-btn" onclick="removeTeam(${index})" title="Remove team">✕</button>
+        </div>
+    `).join('');
+}
+
+// Save settings to API
+async function saveSettings() {
+    const locationName = document.getElementById('setting-location-name').value.trim();
+    const locationLat = parseFloat(document.getElementById('setting-location-lat').value) || 0;
+    const locationLon = parseFloat(document.getElementById('setting-location-lon').value) || 0;
+    const nwsZones = document.getElementById('setting-nws-zones').value.trim();
+
+    try {
+        const response = await fetch(`${API_BASE}/api/settings`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                location: {
+                    location_name: locationName,
+                    location_lat: locationLat,
+                    location_lon: locationLon,
+                    nws_zone_codes: nwsZones
+                },
+                sports_teams: settingsData.sports_teams
+            })
+        });
+
+        if (response.ok) {
+            alert('Settings saved! Refresh the page to see weather/traffic updates.');
+        } else {
+            const error = await response.json();
+            alert(error.detail || 'Failed to save settings');
+        }
+    } catch (err) {
+        console.error('Failed to save settings:', err);
+        alert('Failed to save settings');
+    }
+}
+
+// Search for teams (debounced)
+function searchTeams() {
+    const query = document.getElementById('team-search').value.trim();
+    const resultsContainer = document.getElementById('team-search-results');
+
+    // Clear previous timer
+    if (searchDebounceTimer) {
+        clearTimeout(searchDebounceTimer);
+    }
+
+    if (query.length < 2) {
+        resultsContainer.classList.remove('show');
+        return;
+    }
+
+    // Debounce search
+    searchDebounceTimer = setTimeout(async () => {
+        try {
+            const response = await fetch(`${API_BASE}/api/settings/teams/search?q=${encodeURIComponent(query)}`);
+            if (response.ok) {
+                const data = await response.json();
+                renderSearchResults(data.teams || []);
+            }
+        } catch (err) {
+            console.error('Failed to search teams:', err);
+        }
+    }, 300);
+}
+
+// Render search results dropdown
+function renderSearchResults(teams) {
+    const resultsContainer = document.getElementById('team-search-results');
+
+    if (teams.length === 0) {
+        resultsContainer.innerHTML = '<div class="search-result-item"><span>No teams found</span></div>';
+        resultsContainer.classList.add('show');
+        return;
+    }
+
+    // Filter out teams already selected
+    const selectedIds = new Set((settingsData.sports_teams || []).map(t => `${t.league}-${t.espn_id}`));
+    const availableTeams = teams.filter(t => !selectedIds.has(`${t.league}-${t.espn_id}`));
+
+    if (availableTeams.length === 0) {
+        resultsContainer.innerHTML = '<div class="search-result-item"><span>All matching teams already added</span></div>';
+        resultsContainer.classList.add('show');
+        return;
+    }
+
+    resultsContainer.innerHTML = availableTeams.map(team => `
+        <div class="search-result-item" onclick='addTeam(${JSON.stringify(team)})'>
+            <span class="team-name">${escapeHtml(team.name)}</span>
+            <span class="team-league">${team.league.toUpperCase()}</span>
+        </div>
+    `).join('');
+
+    resultsContainer.classList.add('show');
+}
+
+// Add a team to the list
+function addTeam(team) {
+    if (!settingsData.sports_teams) {
+        settingsData.sports_teams = [];
+    }
+
+    settingsData.sports_teams.push({
+        name: team.name,
+        league: team.league,
+        sport: team.sport,
+        espn_id: team.espn_id
+    });
+
+    // Clear search and re-render
+    document.getElementById('team-search').value = '';
+    document.getElementById('team-search-results').classList.remove('show');
+    renderMyTeamsList();
+}
+
+// Remove a team from the list
+function removeTeam(index) {
+    settingsData.sports_teams.splice(index, 1);
+    renderMyTeamsList();
+}
+
+// Close search results when clicking outside
+document.addEventListener('click', (e) => {
+    const searchBox = document.querySelector('.team-search-box');
+    const resultsContainer = document.getElementById('team-search-results');
+    if (searchBox && resultsContainer && !searchBox.contains(e.target)) {
+        resultsContainer.classList.remove('show');
+    }
+});

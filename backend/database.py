@@ -201,6 +201,27 @@ class SyncLog(Base):
         return f"<SyncLog {self.device_id} @ {self.synced_at}>"
 
 
+class UserSettings(Base):
+    """User-configurable settings for location, weather, and sports."""
+    __tablename__ = "user_settings"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    
+    # Location
+    location_name = Column(String(255), nullable=True)
+    location_lat = Column(Float, nullable=True)
+    location_lon = Column(Float, nullable=True)
+    nws_zone_codes = Column(String(255), nullable=True)
+    
+    # Sports teams (stored as JSON array)
+    sports_teams = Column(JSON, default=list)
+    
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    def __repr__(self):
+        return f"<UserSettings {self.location_name}>"
+
+
 # Database initialization
 def init_db():
     """Create all tables if they don't exist, and migrate schema if needed."""

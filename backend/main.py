@@ -70,7 +70,7 @@ logger.addHandler(ch)
 # Now safe to import database and routers
 try:
     from database import init_db, SessionLocal
-    from routers import dashboard, articles, sources
+    from routers import dashboard, articles, sources, settings
 except Exception as e:
     logger.critical(f"[FATAL] Failed to import database or routers: {e}", exc_info=True)
     sys.exit(1)
@@ -166,6 +166,7 @@ app.add_middleware(
 app.include_router(dashboard.router)
 app.include_router(articles.router)
 app.include_router(sources.router)
+app.include_router(settings.router)
 
 
 @app.get("/api/health")

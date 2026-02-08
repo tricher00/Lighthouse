@@ -933,11 +933,11 @@ footer {
     transition: 0.3s;
 }
 
-.toggle-switch input:checked + .toggle-slider {
+.toggle-switch input:checked+.toggle-slider {
     background-color: var(--accent);
 }
 
-.toggle-switch input:checked + .toggle-slider:before {
+.toggle-switch input:checked+.toggle-slider:before {
     transform: translateX(20px);
     background-color: var(--bg-primary);
 }
@@ -983,25 +983,202 @@ footer {
         width: 95%;
         max-height: 90vh;
     }
-    
+
     .source-form {
         flex-direction: column;
     }
-    
+
     .source-form input,
     .source-form select {
         width: 100%;
     }
-    
+
     .source-item {
         flex-direction: column;
         align-items: flex-start;
         gap: var(--spacing-sm);
     }
-    
+
     .source-actions {
         margin-left: 0;
         width: 100%;
         justify-content: flex-end;
     }
+}
+
+/* ============================================
+   Settings Form Styles
+   ============================================ */
+
+.settings-form {
+    display: none;
+}
+
+.settings-form.active {
+    display: block;
+}
+
+.settings-form h3 {
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin: var(--spacing-lg) 0 var(--spacing-sm) 0;
+    padding-bottom: var(--spacing-xs);
+    border-bottom: 1px solid var(--border);
+}
+
+.settings-form h3:first-child {
+    margin-top: 0;
+}
+
+.settings-group {
+    margin-bottom: var(--spacing-md);
+}
+
+.settings-group label {
+    display: block;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-bottom: var(--spacing-xs);
+}
+
+.settings-group input {
+    width: 100%;
+    padding: var(--spacing-sm) var(--spacing-md);
+    font-size: 0.9rem;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+}
+
+.settings-group input:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.settings-row {
+    display: flex;
+    gap: var(--spacing-md);
+}
+
+.settings-row .settings-group {
+    flex: 1;
+}
+
+.help-link {
+    font-size: 0.75rem;
+    color: var(--accent);
+    opacity: 0.8;
+}
+
+/* Team Search */
+.team-search-box {
+    position: relative;
+}
+
+.search-results {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 10;
+    display: none;
+}
+
+.search-results.show {
+    display: block;
+}
+
+.search-result-item {
+    padding: var(--spacing-sm) var(--spacing-md);
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: background 0.15s ease;
+}
+
+.search-result-item:hover {
+    background: var(--bg-elevated);
+}
+
+.search-result-item .team-name {
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.search-result-item .team-league {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+}
+
+/* My Teams List */
+.my-teams-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.my-team-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: var(--bg-primary);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+}
+
+.my-team-item .team-info {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.my-team-item .team-name {
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.my-team-item .team-league {
+    font-size: 0.7rem;
+    padding: 2px 6px;
+    background: var(--bg-elevated);
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    text-transform: uppercase;
+}
+
+.my-team-item .remove-team-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1rem;
+    cursor: pointer;
+    padding: var(--spacing-xs);
+    opacity: 0.5;
+    transition: all 0.2s ease;
+}
+
+.my-team-item .remove-team-btn:hover {
+    opacity: 1;
+    color: var(--error);
+    background: none;
+    border: none;
+}
+
+.my-teams-list .empty-state {
+    padding: var(--spacing-lg);
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.9rem;
 }

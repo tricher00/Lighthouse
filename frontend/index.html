@@ -45,25 +45,17 @@
             </div>
         </section>
 
-        <!-- My Teams -->
-        <section id="boston-sports" class="feed-section">
-            <h2>🏀 My Teams</h2>
-            <div class="article-grid" data-category="boston_sports">
-                <div class="loading">Loading articles...</div>
-            </div>
-        </section>
-
-        <!-- Other Teams -->
-        <section id="other-teams" class="feed-section">
-            <h2>⚾ Other Teams</h2>
-            <div class="article-grid" data-category="other_teams">
+        <!-- Sports (merged from My Teams + Other Teams) -->
+        <section id="sports" class="feed-section">
+            <h2>🏀 Sports</h2>
+            <div class="article-grid" data-category="sports">
                 <div class="loading">Loading articles...</div>
             </div>
         </section>
 
         <!-- League-Wide -->
         <section id="league-wide" class="feed-section">
-            <h2>🏆 League-Wide</h2>
+            <h2>🏆 League News</h2>
             <div class="article-grid" data-category="league_wide">
                 <div class="loading">Loading articles...</div>
             </div>
@@ -112,6 +104,7 @@
             <div class="modal-tabs">
                 <button class="tab-btn active" data-tab="rss" onclick="switchSourceTab('rss')">📰 RSS Feeds</button>
                 <button class="tab-btn" data-tab="reddit" onclick="switchSourceTab('reddit')">💬 Reddit</button>
+                <button class="tab-btn" data-tab="settings" onclick="switchSourceTab('settings')">⚙️ Settings</button>
             </div>
             <div class="modal-body">
                 <!-- Add Source Form -->
@@ -137,10 +130,49 @@
                         <button class="btn btn-primary" onclick="addRedditSource()">Add Subreddit</button>
                     </div>
                 </div>
-                
+
                 <!-- Source List -->
                 <div id="source-list" class="source-list">
                     <div class="loading">Loading sources...</div>
+                </div>
+
+                <!-- Settings Form -->
+                <div id="settings-form" class="settings-form">
+                    <h3>Location</h3>
+                    <div class="settings-group">
+                        <label>Location Name</label>
+                        <input type="text" id="setting-location-name" placeholder="e.g., New York, NY">
+                    </div>
+                    <div class="settings-row">
+                        <div class="settings-group">
+                            <label>Latitude</label>
+                            <input type="number" id="setting-location-lat" step="0.0001" placeholder="40.7128">
+                        </div>
+                        <div class="settings-group">
+                            <label>Longitude</label>
+                            <input type="number" id="setting-location-lon" step="0.0001" placeholder="-74.0060">
+                        </div>
+                    </div>
+                    <div class="settings-group">
+                        <label>NWS Zone Codes <a href="https://alerts.weather.gov/" target="_blank"
+                                class="help-link">(find yours)</a></label>
+                        <input type="text" id="setting-nws-zones" placeholder="e.g., NYZ072,NYZ073">
+                    </div>
+
+                    <h3>Sports Teams</h3>
+                    <div class="settings-group">
+                        <label>Search for a team</label>
+                        <div class="team-search-box">
+                            <input type="text" id="team-search" placeholder="Search teams..." oninput="searchTeams()">
+                            <div id="team-search-results" class="search-results"></div>
+                        </div>
+                    </div>
+                    <div id="my-teams-list" class="my-teams-list">
+                        <!-- Teams will be rendered here -->
+                    </div>
+
+                    <button class="btn btn-primary" onclick="saveSettings()" style="margin-top: 1rem; width: 100%;">Save
+                        Settings</button>
                 </div>
             </div>
         </div>
