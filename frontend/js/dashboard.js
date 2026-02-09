@@ -112,20 +112,74 @@ function renderTraffic(trafficData, locationName) {
     const alerts = trafficData.alerts || [];
     const routes = trafficData.routes || [];
 
-    const routesHtml = routes.map(route => {
+    const routesHtml = routes.map((route, index) => {
         let statusClass = 'status-green';
         if (route.delay >= 10) statusClass = 'status-red';
         else if (route.delay >= 5) statusClass = 'status-yellow';
 
+        const mainRoads = route.main_roads || [];
+        const alternativesCount = route.alternatives_within_margin != null ? route.alternatives_within_margin : 1;
+        const hasMainRoads = mainRoads.length > 0;
+        const panelId = `main-roads-panel-${index}`;
+
+        let mainRoadsContent = '';
+        if (hasMainRoads) {
+            // New format: route alternatives with travel times and key roads
+            const roadsList = mainRoads.map(alt => {
+                const roadsDisplay = alt.key_roads && alt.key_roads.length > 0
+                    ? alt.key_roads.map(r => escapeHtml(r)).join(' → ')
+                    : 'Direct route';
+
+                const timeLabel = `${alt.travel_time_min} min`;
+                const delayLabel = alt.delay_min > 0 ? ` (+${alt.delay_min} delay)` : '';
+                const deltaLabel = alt.time_vs_fastest > 0 ? ` (+${alt.time_vs_fastest})` : '';
+
+                const fastestBadge = alt.is_fastest && alternativesCount > 1 ? '<span class="fastest-badge">★ Fastest</span>' : '';
+                const hasIncident = alt.status && alt.status !== 'Clear conditions';
+                const statusClass = hasIncident ? 'has-incident' : '';
+                const delayClass = alt.delay_min > 0 ? 'has-delay' : '';
+
+                let statusHtml = '';
+                if (hasIncident) {
+                    statusHtml = `<div class="main-road-status">⚠️ ${escapeHtml(alt.status)}</div>`;
+                }
+
+                return `<li class="main-road-item ${statusClass} ${delayClass}">
+                    <div class="route-alt-header">
+                        <span class="route-alt-via">via ${roadsDisplay}</span>
+                        ${fastestBadge}
+                    </div>
+                    <div class="route-alt-time">${timeLabel}${delayLabel}${deltaLabel}</div>
+                    ${statusHtml}
+                </li>`;
+            }).join('');
+            mainRoadsContent = `
+                <div id="${panelId}" class="traffic-route-expandable" role="region" aria-labelledby="main-roads-toggle-${index}" hidden>
+                    ${alternativesCount > 1 ? `<p class="main-roads-summary">${alternativesCount} route options</p>` : ''}
+                    <ul class="main-roads-list">${roadsList}</ul>
+                </div>`;
+        } else {
+            mainRoadsContent = `
+                <div id="${panelId}" class="traffic-route-expandable traffic-route-expandable-empty" role="region" aria-labelledby="main-roads-toggle-${index}" hidden>
+                    <p class="main-roads-empty">No route alternatives available</p>
+                </div>`
+        }
+
+        const toggleLabel = hasMainRoads ? 'Main roads' : 'Main roads (none)';
         return `
-            <div class="traffic-route ${statusClass}">
-                <div class="route-info">
-                    <span class="route-name">${escapeHtml(route.name)}</span>
-                    <span class="route-time">${route.current_duration} min</span>
+            <div class="traffic-route ${statusClass}" data-route-index="${index}">
+                <div class="route-summary-row">
+                    <div class="route-info">
+                        <span class="route-name">${escapeHtml(route.name)}</span>
+                        <span class="route-time">${route.current_duration} min</span>
+                    </div>
+                    <div class="route-delay">
+                        ${route.delay > 0 ? `+${route.delay} min delay` : 'No delay'}
+                    </div>
+                    <button type="button" class="traffic-route-toggle" id="main-roads-toggle-${index}" aria-expanded="false" aria-controls="${panelId}" onclick="toggleMainRoads(${index})" title="${toggleLabel}">Main roads <span class="toggle-chevron" aria-hidden="true">▼</span></button>
                 </div>
-                <div class="route-delay">
-                    ${route.delay > 0 ? `+${route.delay} min delay` : 'No delay'}
-                </div>
+                ${route.notes ? `<div class="route-notes">${escapeHtml(route.notes)}</div>` : ''}
+                ${mainRoadsContent}
             </div>
         `;
     }).join('');
@@ -151,6 +205,16 @@ function renderTraffic(trafficData, locationName) {
             ${alerts.length > 0 ? `<div class="traffic-alerts">${alertsHtml}</div>` : ''}
         </div>
     `;
+}
+
+function toggleMainRoads(index) {
+    const panel = document.getElementById(`main-roads-panel-${index}`);
+    const btn = document.getElementById(`main-roads-toggle-${index}`);
+    if (!panel || !btn) return;
+    const isExpanded = btn.getAttribute('aria-expanded') === 'true';
+    panel.hidden = isExpanded;
+    btn.setAttribute('aria-expanded', !isExpanded);
+    btn.querySelector('.toggle-chevron')?.classList.toggle('toggle-chevron-open', !isExpanded);
 }
 
 // Render games card
@@ -794,7 +858,8 @@ async function deleteSource(sourceId, sourceName) {
 let settingsData = {
     location: { name: '', lat: 0, lon: 0, nws_zone_codes: '' },
     sports_teams: [],
-    traffic_routes: []
+    traffic_routes: [],
+    traffic_options: { max_alternatives: 3, time_margin_percent: 15 }
 };
 let searchDebounceTimer = null;
 
@@ -829,6 +894,10 @@ function renderSettings() {
     document.getElementById('setting-location-lat').value = settingsData.location?.lat || '';
     document.getElementById('setting-location-lon').value = settingsData.location?.lon || '';
     document.getElementById('location-search').value = '';
+
+    const opts = settingsData.traffic_options || { max_alternatives: 3, time_margin_percent: 15 };
+    document.getElementById('traffic-max-alternatives').value = Math.min(5, Math.max(1, opts.max_alternatives ?? 3));
+    document.getElementById('traffic-time-margin').value = Math.min(50, Math.max(5, opts.time_margin_percent ?? 15));
 
     renderMyTeamsList();
     renderTrafficRoutesList();
@@ -880,11 +949,24 @@ function renderTrafficRoutesList() {
                 <span class="route-path">${escapeHtml(route.origin)} → ${escapeHtml(route.destination)}</span>
             </div>
             <div class="route-actions">
+                <button class="rename-route-btn" onclick="renameTrafficRoute(${index})" title="Rename route">✏️</button>
                 <button class="reverse-route-btn" onclick="reverseTrafficRoute(${index})" title="Add reverse route">🔃</button>
                 <button class="remove-route-btn" onclick="removeTrafficRoute(${index})" title="Remove route">✕</button>
             </div>
         </div>
     `).join('');
+}
+
+// Rename a traffic route
+function renameTrafficRoute(index) {
+    const route = settingsData.traffic_routes[index];
+    if (!route) return;
+
+    const newName = prompt('Enter new name for this route:', route.name);
+    if (newName && newName.trim()) {
+        settingsData.traffic_routes[index].name = newName.trim();
+        renderTrafficRoutesList();
+    }
 }
 
 // Reverse a traffic route
@@ -960,6 +1042,13 @@ async function saveSettings() {
     saveBtn.textContent = 'Saving...';
     saveBtn.disabled = true;
 
+    const maxAlt = parseInt(document.getElementById('traffic-max-alternatives').value, 10) || 3;
+    const timeMargin = parseInt(document.getElementById('traffic-time-margin').value, 10) || 15;
+    const trafficOptions = {
+        max_alternatives: Math.min(5, Math.max(1, maxAlt)),
+        time_margin_percent: Math.min(50, Math.max(5, timeMargin))
+    };
+
     try {
         // 1. Save settings
         const response = await fetch(`${API_BASE}/api/settings`, {
@@ -973,7 +1062,8 @@ async function saveSettings() {
                     nws_zone_codes: ''
                 },
                 sports_teams: settingsData.sports_teams,
-                traffic_routes: settingsData.traffic_routes
+                traffic_routes: settingsData.traffic_routes,
+                traffic_options: trafficOptions
             })
         });
 

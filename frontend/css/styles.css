@@ -427,6 +427,126 @@ section h2 {
     color: var(--error);
 }
 
+.route-summary-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.route-summary-row .route-info {
+    margin-bottom: 0;
+    flex: 1;
+    min-width: 0;
+}
+
+.route-summary-row .route-delay {
+    flex-shrink: 0;
+}
+
+.traffic-route-toggle {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+}
+
+.traffic-route-toggle:hover {
+    color: var(--text-primary);
+    border-color: var(--text-muted);
+}
+
+.traffic-route-toggle .toggle-chevron {
+    display: inline-block;
+    transition: transform 0.2s ease;
+}
+
+.traffic-route-toggle .toggle-chevron-open {
+    transform: rotate(-180deg);
+}
+
+.traffic-route-expandable {
+    margin-top: var(--spacing-sm);
+    padding-top: var(--spacing-sm);
+    border-top: 1px solid var(--border);
+}
+
+.traffic-route-expandable .main-roads-summary {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin: 0 0 6px 0;
+}
+
+.traffic-route-expandable .main-roads-empty {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin: 0;
+}
+
+.main-roads-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.main-road-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 0.85rem;
+    padding: var(--spacing-xs) var(--spacing-sm);
+    margin: 2px 0;
+    border-radius: var(--radius-sm);
+    background: var(--surface-secondary);
+}
+
+.route-alt-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+}
+
+.route-alt-via {
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.route-alt-time {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.fastest-badge {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--success);
+    background: rgba(16, 185, 129, 0.1);
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+}
+
+.main-road-item.has-delay .route-alt-time {
+    color: var(--warning);
+}
+
+.main-road-item.has-incident {
+    background: rgba(251, 191, 36, 0.12);
+    border-left: 3px solid var(--warning);
+}
+
+.main-road-status {
+    font-size: 0.75rem;
+    color: var(--warning);
+}
+
 /* Sports card */
 #sports-card .game {
     display: flex;
@@ -1704,7 +1824,8 @@ body.reader-open {
     gap: var(--spacing-xs);
 }
 
-.reverse-route-btn {
+.reverse-route-btn,
+.rename-route-btn {
     background: none;
     border: none;
     color: var(--text-muted);
@@ -1715,7 +1836,8 @@ body.reader-open {
     transition: color 0.2s;
 }
 
-.reverse-route-btn:hover {
+.reverse-route-btn:hover,
+.rename-route-btn:hover {
     color: var(--accent);
 }
 

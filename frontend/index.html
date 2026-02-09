@@ -190,6 +190,18 @@
                         <!-- Routes will be rendered here -->
                     </div>
 
+                    <h3>Traffic Options</h3>
+                    <div class="settings-group">
+                        <label for="traffic-max-alternatives">Max alternative routes</label>
+                        <input type="number" id="traffic-max-alternatives" min="1" max="5" value="3" title="1-5">
+                        <small>Number of alternative routes to request from TomTom (1-5)</small>
+                    </div>
+                    <div class="settings-group">
+                        <label for="traffic-time-margin">Time margin (%)</label>
+                        <input type="number" id="traffic-time-margin" min="5" max="50" value="15" title="5-50">
+                        <small>Only alternatives within this % of fastest route are used for main roads (5-50)</small>
+                    </div>
+
                     <button class="btn btn-primary" onclick="saveSettings()" style="margin-top: 1rem; width: 100%;">Save
                         Settings</button>
                 </div>

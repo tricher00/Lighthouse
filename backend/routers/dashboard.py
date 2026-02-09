@@ -68,6 +68,9 @@ async def get_dashboard(
                 "current_duration": route.current_duration_minutes,
                 "typical_duration": route.typical_duration_minutes,
                 "delay": route.delay_minutes,
+                "notes": route.traffic_notes,
+                "main_roads": route.main_roads if route.main_roads is not None else [],
+                "alternatives_within_margin": route.alternatives_within_margin if route.alternatives_within_margin is not None else 1,
                 "fetched_at": route.fetched_at.isoformat() if route.fetched_at else None
             }
             for route in route_estimates

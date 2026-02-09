@@ -172,6 +172,9 @@ class TrafficRoute(Base):
     current_duration_minutes = Column(Integer, nullable=True)
     typical_duration_minutes = Column(Integer, nullable=True)
     delay_minutes = Column(Integer, nullable=True)
+    traffic_notes = Column(Text, nullable=True)  # Brief incident summary for display
+    main_roads = Column(JSON, nullable=True)  # [{name, route_count, delay_minutes?, status?}] from alternatives within margin
+    alternatives_within_margin = Column(Integer, nullable=True)  # number of routes within time margin (incl. primary)
     fetched_at = Column(DateTime, default=datetime.utcnow)
     
     def __repr__(self):
@@ -242,6 +245,8 @@ class UserSettings(Base):
     
     # Traffic routes (stored as JSON array)
     traffic_routes = Column(JSON, default=list)
+    # Traffic options: max_alternatives (1-5), time_margin_percent (5-50)
+    traffic_options = Column(JSON, nullable=True)
     
     # Reader mode settings
     reader_blacklisted_sources = Column(JSON, default=list)  # List of source IDs
@@ -284,6 +289,7 @@ def init_db():
     add_column_if_missing('user_settings', 'reader_cache_hours', 'INTEGER')
     add_column_if_missing('user_settings', 'reader_theme', 'TEXT')
     add_column_if_missing('user_settings', 'traffic_routes', 'JSON')
+    add_column_if_missing('user_settings', 'traffic_options', 'JSON')
     
     # TrafficRoute migrations
     add_column_if_missing('traffic_routes', 'origin_lat', 'FLOAT')
@@ -292,6 +298,9 @@ def init_db():
     add_column_if_missing('traffic_routes', 'dest_lon', 'FLOAT')
     add_column_if_missing('traffic_routes', 'origin_zone', 'TEXT')
     add_column_if_missing('traffic_routes', 'dest_zone', 'TEXT')
+    add_column_if_missing('traffic_routes', 'traffic_notes', 'TEXT')
+    add_column_if_missing('traffic_routes', 'main_roads', 'JSON')
+    add_column_if_missing('traffic_routes', 'alternatives_within_margin', 'INTEGER')
     
     # Ensure traffic_routes table exists
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='traffic_routes'")
@@ -311,6 +320,9 @@ def init_db():
                 current_duration_minutes INTEGER,
                 typical_duration_minutes INTEGER,
                 delay_minutes INTEGER,
+                traffic_notes TEXT,
+                main_roads JSON,
+                alternatives_within_margin INTEGER,
                 fetched_at DATETIME
             )
         ''')

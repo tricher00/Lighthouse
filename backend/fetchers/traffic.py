@@ -35,7 +35,7 @@ async def geocode_address(session: aiohttp.ClientSession, address: str) -> Optio
     params = {"key": TRAFFIC_API_KEY, "limit": 1}
     
     try:
-        async with session.get(url, params=params) as response:
+        async with session.get(url, params=params, ssl=False) as response:
             if response.status != 200:
                 err_text = await response.text()
                 logger.warning(f"[TRAFFIC] Geocoding error for {address}: {response.status} - {err_text[:100]}")
@@ -75,6 +75,93 @@ async def get_nws_zone_from_coords(session: aiohttp.ClientSession, lat: float, l
     
     return None
 
+# Icon category to human-readable type mapping
+INCIDENT_TYPES = {
+    0: "Unknown",
+    1: "Accident",
+    2: "Fog",
+    3: "Dangerous Conditions",
+    4: "Rain",
+    5: "Ice",
+    6: "Jam",
+    7: "Lane Closed",
+    8: "Road Closed",
+    9: "Road Works",
+    10: "Wind",
+    11: "Flooding",
+    14: "Broken Down Vehicle"
+}
+
+async def fetch_route_incidents(session: aiohttp.ClientSession, 
+                                 origin_lat: float, origin_lon: float,
+                                 dest_lat: float, dest_lon: float) -> str:
+    """Fetch traffic incidents along a route using bounding box. Returns summary string."""
+    if not TRAFFIC_API_KEY:
+        return ""
+    
+    # Create bounding box with some padding (0.05 degrees ~= 3-5 miles)
+    padding = 0.05
+    min_lat = min(origin_lat, dest_lat) - padding
+    max_lat = max(origin_lat, dest_lat) + padding
+    min_lon = min(origin_lon, dest_lon) - padding
+    max_lon = max(origin_lon, dest_lon) + padding
+    
+    bbox = f"{min_lon},{min_lat},{max_lon},{max_lat}"
+    
+    # Request incident details with key fields
+    url = f"https://api.tomtom.com/traffic/services/5/incidentDetails"
+    params = {
+        "key": TRAFFIC_API_KEY,
+        "bbox": bbox,
+        "fields": "{incidents{properties{iconCategory,magnitudeOfDelay,from,to,delay,roadNumbers,events{description}}}}",
+        "language": "en-US"
+    }
+    
+    try:
+        async with session.get(url, params=params, ssl=False) as response:
+            if response.status != 200:
+                return ""
+            
+            data = await response.json()
+            incidents = data.get("incidents", [])
+            
+            if not incidents:
+                return "Clear conditions"
+            
+            # Summarize incidents - focus on most significant
+            summaries = []
+            for inc in incidents[:3]:  # Top 3 incidents
+                props = inc.get("properties", {})
+                icon_cat = props.get("iconCategory", 0)
+                incident_type = INCIDENT_TYPES.get(icon_cat, "Issue")
+                
+                road_from = props.get("from", "")
+                road_to = props.get("to", "")
+                road_nums = props.get("roadNumbers", [])
+                delay_sec = props.get("delay", 0)
+                
+                # Build location string
+                location = ""
+                if road_nums:
+                    location = ", ".join(road_nums)
+                elif road_from:
+                    location = road_from
+                
+                # Build summary
+                if delay_sec and delay_sec > 60:
+                    delay_min = round(delay_sec / 60)
+                    summaries.append(f"{incident_type} on {location} (+{delay_min}min)" if location else f"{incident_type} (+{delay_min}min)")
+                elif location:
+                    summaries.append(f"{incident_type} on {location}")
+                else:
+                    summaries.append(incident_type)
+            
+            return "; ".join(summaries) if summaries else "Minor congestion"
+            
+    except Exception as e:
+        logger.warning(f"[TRAFFIC] Incidents fetch error: {e}")
+        return ""
+
 def get_active_traffic_settings(db: Session = None) -> Dict[str, Any]:
     """Get traffic settings from UserSettings DB, falling back to config env vars."""
     local_db = False
@@ -91,19 +178,208 @@ def get_active_traffic_settings(db: Session = None) -> Dict[str, Any]:
         if settings and settings.traffic_routes:
             routes = settings.traffic_routes
             
-        # Determine NWS Zone Codes
-        zone_codes = NWS_ZONE_CODES
+        # Determine NWS Zone Codes - only use config default if user has no location set
+        # If user has a location but no explicit zones, we'll rely on route zones instead
+        zone_codes = None
         if settings and settings.nws_zone_codes:
             zone_codes = settings.nws_zone_codes
+        elif not settings or not settings.location_name:
+            # No user settings at all - use env default
+            zone_codes = NWS_ZONE_CODES
             
+        # Traffic options for alternative routes and time margin (defaults if missing)
+        traffic_options = (settings.traffic_options or {}) if settings else {}
+        if not isinstance(traffic_options, dict):
+            traffic_options = {}
+        traffic_options.setdefault("max_alternatives", 3)
+        traffic_options.setdefault("time_margin_percent", 15)
+        traffic_options["max_alternatives"] = min(5, max(1, int(traffic_options["max_alternatives"])))
+        traffic_options["time_margin_percent"] = min(50, max(5, int(traffic_options["time_margin_percent"])))
+
         return {
             "routes": routes,
             "zone_codes": zone_codes,
-            "location_name": settings.location_name if settings else LOCATION_NAME
+            "location_name": settings.location_name if settings else LOCATION_NAME,
+            "traffic_options": traffic_options
         }
     finally:
         if local_db:
             db.close()
+
+
+def routes_within_time_margin(
+    routes_data: List[Dict[str, Any]], time_margin_percent: int
+) -> List[int]:
+    """
+    Return indices of routes whose travelTimeInSeconds is within time_margin_percent of the fastest.
+    routes_data: list of route dicts with summary.travelTimeInSeconds.
+    time_margin_percent: e.g. 15 means within 15% of fastest (inclusive).
+    Always includes index 0 (fastest).
+    """
+    if not routes_data:
+        return []
+    times = []
+    for i, r in enumerate(routes_data):
+        summary = r.get("summary") or {}
+        t = summary.get("travelTimeInSeconds")
+        if t is not None:
+            times.append((i, t))
+    if not times:
+        return [0] if routes_data else []
+    times.sort(key=lambda x: x[1])
+    fastest_sec = times[0][1]
+    if fastest_sec <= 0:
+        return list(range(len(routes_data)))
+    max_sec = fastest_sec * (1 + time_margin_percent / 100.0)
+    included_indices = {idx for idx, t in times if t <= max_sec}
+    return sorted(i for i in range(len(routes_data)) if i in included_indices)
+
+
+def extract_road_names_from_route(route_obj: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """
+    Extract important road stretches from a single route.
+    Returns list of dicts with {name, length_estimate} for major roads only (from importantRoadStretch sections).
+    Turn-by-turn guidance is ignored since it includes every minor street.
+    """
+    roads = []
+    seen_keys = set()
+    
+    # Only extract from IMPORTANT_ROAD_STRETCH sections - these are the major roads
+    for section in route_obj.get("sections") or []:
+        if section.get("sectionType") != "IMPORTANT_ROAD_STRETCH":
+            continue
+        
+        start_idx = section.get("startPointIndex", 0)
+        end_idx = section.get("endPointIndex", start_idx)
+        
+        # Estimate length from point indices
+        length_estimate = max(1, end_idx - start_idx)
+        
+        # Get road name from streetName or roadNumbers
+        # Both can be dicts with 'text' field or strings
+        street_name_raw = section.get("streetName", "")
+        road_numbers = section.get("roadNumbers") or []
+        
+        # streetName can be dict like {"text": "Main St"} or a string
+        if isinstance(street_name_raw, dict):
+            street_name = street_name_raw.get("text", "")
+        else:
+            street_name = str(street_name_raw).strip() if street_name_raw else ""
+        
+        # Extract text from roadNumbers (may be dict or string)
+        road_num_texts = []
+        for rn in road_numbers:
+            if isinstance(rn, dict):
+                road_num_texts.append(rn.get("text", str(rn)))
+            else:
+                road_num_texts.append(str(rn))
+        
+        # Prefer highway/route numbers over street names for display
+        display_name = ""
+        if road_num_texts:
+            display_name = ", ".join(road_num_texts[:2])  # Limit to 2 route numbers
+        elif street_name:
+            display_name = street_name.strip()
+        
+        # Skip very short stretches (less than 20 points ~ less than ~1 mile)
+        if length_estimate < 20:
+            continue
+        
+        if display_name and display_name.lower() not in seen_keys:
+            seen_keys.add(display_name.lower())
+            roads.append({
+                "name": display_name,
+                "length_estimate": length_estimate
+            })
+    
+    # Sort by length (longest stretches first = main roads)
+    roads.sort(key=lambda x: -x["length_estimate"])
+    
+    return roads
+
+
+def aggregate_main_roads(
+    routes_data: List[Dict[str, Any]],
+    within_margin_indices: List[int],
+    primary_delay_minutes: Optional[int] = None,
+    primary_notes: Optional[str] = None
+) -> List[Dict[str, Any]]:
+    """
+    Build route alternatives list showing each route option with its travel time and key roads.
+    Returns: [{travel_time_min, delay_min, is_fastest, key_roads: [road names]}]
+    """
+    total_routes = len(within_margin_indices)
+    if total_routes == 0:
+        return []
+    
+    # First, collect all roads per route and their times
+    routes_info = []
+    for idx in within_margin_indices:
+        if idx >= len(routes_data):
+            continue
+        route = routes_data[idx]
+        summary = route.get("summary", {})
+        travel_time = round(summary.get("travelTimeInSeconds", 0) / 60)
+        delay = round(summary.get("trafficDelayInSeconds", 0) / 60)
+        
+        road_list = extract_road_names_from_route(route)
+        # Just get road names, sorted by length (key roads first)
+        road_names = [r["name"] for r in road_list[:3]]  # Top 3 key roads
+        
+        routes_info.append({
+            "travel_time_min": travel_time,
+            "delay_min": delay,
+            "roads": road_names,
+            "road_set": set(r.lower() for r in road_names)
+        })
+    
+    if not routes_info:
+        return []
+    
+    # Find fastest time
+    min_time = min(r["travel_time_min"] for r in routes_info)
+    
+    # Find roads common to ALL routes (to exclude)
+    if len(routes_info) > 1:
+        common_roads = routes_info[0]["road_set"]
+        for r in routes_info[1:]:
+            common_roads = common_roads & r["road_set"]
+    else:
+        common_roads = set()
+    
+    # Build result with unique identifying roads for each route
+    result = []
+    for i, r in enumerate(routes_info):
+        # Get roads that distinguish this route (not in all routes)
+        unique_roads = [name for name in r["roads"] if name.lower() not in common_roads]
+        # Fall back to all roads if none are unique (single route case)
+        display_roads = unique_roads[:2] if unique_roads else r["roads"][:2]
+        
+        is_fastest = r["travel_time_min"] == min_time
+        delta = r["travel_time_min"] - min_time
+        
+        entry = {
+            "route_num": i + 1,
+            "travel_time_min": r["travel_time_min"],
+            "delay_min": r["delay_min"],
+            "is_fastest": is_fastest,
+            "time_vs_fastest": delta,
+            "key_roads": display_roads,
+            "status": None
+        }
+        
+        # Check for incidents mentioning these roads
+        if primary_notes:
+            for road in display_roads:
+                if road.lower() in primary_notes.lower():
+                    entry["status"] = primary_notes[:100] if len(primary_notes) > 100 else primary_notes
+                    break
+        
+        result.append(entry)
+    
+    # Sort by travel time so fastest is first
+    result.sort(key=lambda x: x["travel_time_min"])
+    return result
 
 async def fetch_route_estimates(db: Session = None) -> tuple[int, List[str]]:
     """Fetch real-time commute estimates from TomTom Routing API. Returns (count, errors)."""
@@ -115,11 +391,27 @@ async def fetch_route_estimates(db: Session = None) -> tuple[int, List[str]]:
     # Get active settings (DB-driven)
     settings = get_active_traffic_settings(db)
     routes_config = settings["routes"]
-    
+    traffic_options = settings.get("traffic_options") or {}
+    # User's max_alternatives is the TOTAL routes they want to see
+    # TomTom's maxAlternatives param is NUMBER OF ALTERNATIVES (excludes primary)
+    # So if user wants 3 total, we pass 2 to TomTom (1 primary + 2 alternatives = 3)
+    total_routes_wanted = min(5, max(1, traffic_options.get("max_alternatives", 3)))
+    max_alternatives_param = max(0, total_routes_wanted - 1)
+    time_margin_percent = min(50, max(5, traffic_options.get("time_margin_percent", 15)))
+
     if not TRAFFIC_API_KEY or not routes_config:
         logger.info("[TRAFFIC] Skipping route estimates (no API key or routes configured)")
         return 0, []
  
+    # Get list of configured route names and clean up stale routes
+    configured_names = {r.get("name") for r in routes_config if r.get("name")}
+    stale_routes = db.query(TrafficRoute).filter(~TrafficRoute.name.in_(configured_names)).all()
+    if stale_routes:
+        for stale in stale_routes:
+            db.delete(stale)
+        db.commit()
+        logger.info(f"[TRAFFIC] Removed {len(stale_routes)} stale route(s)")
+
     total_updated = 0
     errors = []
     try:
@@ -168,11 +460,14 @@ async def fetch_route_estimates(db: Session = None) -> tuple[int, List[str]]:
                     "key": TRAFFIC_API_KEY,
                     "traffic": "true",
                     "travelMode": "car",
-                    "departAt": "now"
+                    "departAt": "now",
+                    "maxAlternatives": max_alternatives_param,
+                    "sectionType": ["importantRoadStretch", "traffic"],
+                    "instructionsType": "text"
                 }
  
                 try:
-                    async with session.get(url, params=params) as response:
+                    async with session.get(url, params=params, ssl=False) as response:
                         if response.status != 200:
                             err_text = await response.text()
                             msg = f"TomTom API level error for {name}: {response.status}"
@@ -192,6 +487,25 @@ async def fetch_route_estimates(db: Session = None) -> tuple[int, List[str]]:
                         cur_duration = round(travel_time / 60)
                         delay_min = round(delay / 60)
                         typical_duration = cur_duration - delay_min
+
+                        # Fetch incident details for this route FIRST
+                        traffic_notes = ""
+                        if origin_lat and dest_lat:
+                            traffic_notes = await fetch_route_incidents(
+                                session, origin_lat, origin_lon, dest_lat, dest_lon
+                            )
+
+                        # Filter routes within time margin and build main roads
+                        within_indices = routes_within_time_margin(routes_data, time_margin_percent)
+                        alternatives_within_margin = len(within_indices)
+                        main_roads_list: List[Dict[str, Any]] = []
+                        if within_indices:
+                            # Pass traffic notes so roads with incidents get status attached
+                            main_roads_list = aggregate_main_roads(
+                                routes_data, within_indices,
+                                primary_delay_minutes=delay_min if delay_min else None,
+                                primary_notes=traffic_notes if traffic_notes else None
+                            )
  
                         # Update or create database record
                         route = db.query(TrafficRoute).filter(TrafficRoute.name == name).first()
@@ -202,6 +516,8 @@ async def fetch_route_estimates(db: Session = None) -> tuple[int, List[str]]:
                         route.current_duration_minutes = cur_duration
                         route.typical_duration_minutes = typical_duration
                         route.delay_minutes = delay_min
+                        route.main_roads = main_roads_list
+                        route.alternatives_within_margin = alternatives_within_margin
                         route.fetched_at = datetime.utcnow()
                         
                         # Save coords
@@ -215,6 +531,9 @@ async def fetch_route_estimates(db: Session = None) -> tuple[int, List[str]]:
                             route.origin_zone = await get_nws_zone_from_coords(session, origin_lat, origin_lon)
                         if not route.dest_zone and dest_lat:
                             route.dest_zone = await get_nws_zone_from_coords(session, dest_lat, dest_lon)
+                        
+                        # Store traffic notes in DB
+                        route.traffic_notes = traffic_notes
                             
                         total_updated += 1
                 except Exception as route_err:
@@ -311,7 +630,7 @@ async def fetch_traffic_alerts() -> tuple[int, List[str]]:
                         description=f"{props.get('headline')}: {props.get('description')[:500]} (ID: {alert_id})",
                         severity=internal_severity,
                         location=area,
-                        url=f"https://forecast.weather.gov/MapClick.php?zoneid={zone_codes.split(',')[0]}",
+                        url=f"https://forecast.weather.gov/MapClick.php?zoneid={combined_zones.split(',')[0]}",
                         reported_at=datetime.fromisoformat(props.get('onset').replace('Z', '+00:00')) if props.get('onset') else datetime.utcnow(),
                         expires_at=datetime.fromisoformat(props.get('expires').replace('Z', '+00:00')) if props.get('expires') else datetime.utcnow() + timedelta(hours=4)
                     )

@@ -4,12 +4,20 @@ Handles user settings for location, weather zones, and sports teams.
 """
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from database import get_db, UserSettings
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
+
+# Default traffic options when not set
+DEFAULT_TRAFFIC_OPTIONS = {"max_alternatives": 3, "time_margin_percent": 15}
+
+
+class TrafficOptions(BaseModel):
+    max_alternatives: int = Field(default=3, ge=1, le=5, description="Max alternative routes (1-5)")
+    time_margin_percent: int = Field(default=15, ge=5, le=50, description="Only alternatives within this % of fastest (5-50)")
 
 
 class LocationSettings(BaseModel):
@@ -36,6 +44,7 @@ class SettingsUpdate(BaseModel):
     location: Optional[LocationSettings] = None
     sports_teams: Optional[List[SportsTeam]] = None
     traffic_routes: Optional[List[TrafficRouteUpdate]] = None
+    traffic_options: Optional[TrafficOptions] = None
 
 
 @router.get("")
@@ -53,9 +62,12 @@ async def get_settings(db: Session = Depends(get_db)):
                 "lon": LOCATION_LON,
                 "nws_zone_codes": NWS_ZONE_CODES
             },
-            "sports_teams": SPORTS_TEAMS
+            "sports_teams": SPORTS_TEAMS,
+            "traffic_routes": [],
+            "traffic_options": DEFAULT_TRAFFIC_OPTIONS
         }
     
+    traffic_options = settings.traffic_options if settings.traffic_options is not None else DEFAULT_TRAFFIC_OPTIONS
     return {
         "location": {
             "name": settings.location_name,
@@ -64,7 +76,8 @@ async def get_settings(db: Session = Depends(get_db)):
             "nws_zone_codes": settings.nws_zone_codes
         },
         "sports_teams": settings.sports_teams or [],
-        "traffic_routes": settings.traffic_routes or []
+        "traffic_routes": settings.traffic_routes or [],
+        "traffic_options": traffic_options
     }
 
 
@@ -96,6 +109,9 @@ async def update_settings(update: SettingsUpdate, db: Session = Depends(get_db))
     
     if update.traffic_routes is not None:
         settings.traffic_routes = [r.model_dump() for r in update.traffic_routes]
+    
+    if update.traffic_options is not None:
+        settings.traffic_options = update.traffic_options.model_dump()
     
     db.commit()
     db.refresh(settings)
