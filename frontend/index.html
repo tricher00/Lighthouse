@@ -9,13 +9,31 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/styles.css">
+    <link rel="stylesheet" href="/static/css/styles.css?v=3">
+    <link rel="icon" type="image/png" href="/static/icons/icon-192.png">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#0f3460">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
 </head>
 
 <body>
+    <!-- Offline Indicator -->
+    <div id="offline-banner" class="offline-banner hidden">
+        📡 Offline mode — changes will sync when you reconnect
+    </div>
+
     <header>
         <div class="logo">
-            <span class="icon">🗼</span>
+            <svg class="logo-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <!-- Cap -->
+                <path d="M12 2L16 6H8L12 2Z" fill="#38bdf8" />
+                <!-- Lantern -->
+                <rect x="9" y="6" width="6" height="4" fill="#eab308" />
+                <!-- Body -->
+                <path d="M10 10L9 22H15L14 10H10Z" fill="#38bdf8" />
+            </svg>
             <h1>Lighthouse</h1>
         </div>
         <nav>
@@ -269,6 +287,15 @@
         </div>
     </div>
 
+    <!-- PWA Install Banner -->
+    <div id="install-banner" class="install-banner hidden">
+        <div class="install-content">
+            <span class="install-title">📲 Install Lighthouse</span>
+            <span class="install-desc">Add to Home Screen for quick access</span>
+        </div>
+        <button id="install-btn" class="btn btn-primary">Install</button>
+        <button id="install-dismiss" class="btn-dismiss">✕</button>
+    </div>
 
     <footer>
         <div class="footer-stats">
@@ -278,7 +305,32 @@
         </div>
     </footer>
 
-    <script src="/static/js/dashboard.js"></script>
+    <script src="/static/js/offline.js?v=2"></script>
+    <script src="/static/js/dashboard.js?v=2"></script>
+    <script>
+        // Register Service Worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(registration => {
+                        console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                    })
+                    .catch(error => {
+                        console.log('ServiceWorker registration failed: ', error);
+                        // Improve mobile debugging: check for secure context
+                        const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+                        if (!isLocalhost && window.location.protocol !== 'https:') {
+                            const banner = document.getElementById('offline-banner');
+                            if (banner) {
+                                banner.textContent = '⚠️ PWA requires HTTPS or localhost. Install disabled.';
+                                banner.style.background = '#e74c3c';
+                                banner.classList.remove('hidden');
+                            }
+                        }
+                    });
+            });
+        }
+    </script>
 </body>
 
 </html>

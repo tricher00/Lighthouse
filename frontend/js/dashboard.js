@@ -12,12 +12,78 @@ let readerSettings = {
 };
 
 // Initialize on page load
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     console.log('🗼 Lighthouse dashboard loaded');
-    loadReaderSettings(); // Load reader settings globally
+
+    // Initialize Offline Manager
+    try {
+        await OfflineManager.init();
+        console.log('📦 Offline Manager initialized');
+    } catch (e) {
+        console.error('Failed to init Offline Manager:', e);
+    }
+
+    // Check online status
+    updateOnlineStatus();
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    // Initial load
+    loadReaderSettings();
     refreshDashboard();
+
+    // A2HS Install Prompt
+    window.addEventListener('beforeinstallprompt', (e) => {
+        // Prevent Chrome 67 and earlier from automatically showing the prompt
+        e.preventDefault();
+        // Stash the event so it can be triggered later.
+        deferredPrompt = e;
+        // Update UI to notify the user they can add to home screen
+        const installBanner = document.getElementById('install-banner');
+        if (installBanner) installBanner.classList.remove('hidden');
+    });
+
+    document.getElementById('install-btn')?.addEventListener('click', async () => {
+        if (deferredPrompt) {
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            console.log(`User response to the install prompt: ${outcome}`);
+            deferredPrompt = null;
+            document.getElementById('install-banner').classList.add('hidden');
+        }
+    });
+
+    document.getElementById('install-dismiss')?.addEventListener('click', () => {
+        document.getElementById('install-banner').classList.add('hidden');
+    });
 });
 
+let deferredPrompt;
+
+function updateOnlineStatus() {
+    if (navigator.onLine) {
+        handleOnline();
+    } else {
+        handleOffline();
+    }
+}
+
+function handleOnline() {
+    document.body.classList.remove('offline');
+    document.getElementById('offline-banner').classList.add('hidden');
+    console.log('🌐 Online - Syncing actions...');
+    OfflineManager.syncActions().then(() => {
+        refreshDashboard();
+    });
+}
+
+function handleOffline() {
+    document.body.classList.add('offline');
+    document.getElementById('offline-banner').classList.remove('hidden');
+    console.log('📡 Offline mode activated');
+}
+
+// Fetch dashboard data from API
 // Fetch dashboard data from API
 async function refreshDashboard() {
     console.log('🔄 Refreshing dashboard...');
@@ -31,18 +97,35 @@ async function refreshDashboard() {
         dashboardData = await response.json();
         console.log('✅ Dashboard data loaded', dashboardData);
 
-        const locationName = dashboardData.location_name || 'Your Location';
-        renderWeather(dashboardData.weather, locationName);
-        renderTraffic(dashboardData.traffic, locationName);
-        renderGames(dashboardData.games);
-        renderAllSections(dashboardData.sections);
-        updateStats(dashboardData.stats);
+        // Cache for offline use
+        await OfflineManager.cacheDashboard(dashboardData);
+
+        renderDashboardFromData(dashboardData);
 
     } catch (err) {
         console.error('❌ Failed to load dashboard:', err);
-        console.error('Stack trace:', err.stack);
+
+        if (!navigator.onLine) {
+            console.log('📡 Loading cached dashboard...');
+            const cached = await OfflineManager.getCachedDashboard();
+            if (cached) {
+                dashboardData = cached;
+                renderDashboardFromData(cached);
+                return;
+            }
+        }
+
         showError(`Failed to connect to Lighthouse backend. Error: ${err.message}`);
     }
+}
+
+function renderDashboardFromData(data) {
+    const locationName = data.location_name || 'Your Location';
+    renderWeather(data.weather, locationName);
+    renderTraffic(data.traffic, locationName);
+    renderGames(data.games);
+    renderAllSections(data.sections);
+    updateStats(data.stats);
 }
 
 // Render weather card
@@ -50,6 +133,13 @@ function renderWeather(weather, locationName) {
     const card = document.getElementById('weather-card');
 
     if (!weather) {
+        if (!navigator.onLine) {
+            card.innerHTML = `
+                <div class="card-header"><span class="card-title">Weather</span></div>
+                <div class="unavailable">Weather unavailable offline</div>
+            `;
+            return;
+        }
         card.innerHTML = `
             <div class="card-header">
                 <span class="card-title">Weather</span>
@@ -305,17 +395,23 @@ function renderAllSections(sections) {
             if (!grid) continue;
 
             if (!articles || articles.length === 0) {
-                grid.innerHTML = `
-                    <div class="empty-state">
-                        <p>No new articles</p>
-                    </div>
-                `;
+                if (!navigator.onLine) {
+                    section.style.display = 'none';
+                } else {
+                    grid.innerHTML = `
+                        <div class="empty-state">
+                            <p>No new articles</p>
+                        </div>
+                    `;
+                    section.style.display = 'block';
+                }
                 continue;
             }
 
+            section.style.display = 'block';
             grid.innerHTML = articles.map(article => renderArticleCard(article)).join('');
         } catch (err) {
-            console.error(`❌ Error rendering category ${category}:`, err);
+            console.error(`❌ Error rendering category ${sectionId}:`, err);
         }
     }
 }
@@ -390,23 +486,37 @@ async function openArticle(url, articleId) {
 }
 
 // Mark an article as read
+// Mark an article as read
 async function markAsRead(articleId) {
+    // Optimistic UI update
+    const card = document.querySelector(`[data-id="${articleId}"]`);
+    if (card) {
+        card.classList.add('read');
+        const markReadBtn = card.querySelector('.mark-read-btn');
+        if (markReadBtn) {
+            markReadBtn.classList.add('active');
+            markReadBtn.textContent = '✓';
+        }
+    }
+
+    if (!navigator.onLine) {
+        // Queue action
+        await OfflineManager.queueAction({
+            type: 'read',
+            payload: { articleId, url: card ? card.onclick.toString().match(/'(.*?)'/)[1] : null }
+            // Note: extracting URL from onclick might be brittle. 
+            // Better to find it in dashboardData.
+        });
+        return;
+    }
+
     try {
         const response = await fetch(`${API_BASE}/api/articles/${articleId}/read`, {
             method: 'POST'
         });
 
-        if (response.ok) {
-            // Update UI
-            const card = document.querySelector(`[data-id="${articleId}"]`);
-            if (card) {
-                card.classList.add('read');
-                const markReadBtn = card.querySelector('.mark-read-btn');
-                if (markReadBtn) {
-                    markReadBtn.classList.add('active');
-                    markReadBtn.textContent = '✓';
-                }
-            }
+        if (!response.ok) {
+            console.warn('Backend failed to mark read');
         }
     } catch (err) {
         console.error('Failed to mark as read:', err);
@@ -414,27 +524,38 @@ async function markAsRead(articleId) {
 }
 
 // Rate an article
+// Rate an article
 async function rateArticle(articleId, rating) {
+    // Optimistic UI update
+    const card = document.querySelector(`[data-id="${articleId}"]`);
+    if (card) {
+        const thumbsUp = card.querySelector('.rating-btn:first-child');
+        const thumbsDown = card.querySelector('.rating-btn:last-child');
+
+        thumbsUp.classList.toggle('active', rating === 1);
+        thumbsDown.classList.toggle('active', rating === -1);
+
+        // Also mark as read
+        card.classList.add('read');
+    }
+
+    if (!navigator.onLine) {
+        await OfflineManager.queueAction({
+            type: 'rating',
+            payload: { articleId, rating }
+        });
+        return;
+    }
+
     try {
         const response = await fetch(`${API_BASE}/api/articles/${articleId}/rate`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ rating })
         });
-
+        // Ensure read status logic runs on server too
         if (response.ok) {
-            // Update button states
-            const card = document.querySelector(`[data-id="${articleId}"]`);
-            if (card) {
-                const thumbsUp = card.querySelector('.rating-btn:first-child');
-                const thumbsDown = card.querySelector('.rating-btn:last-child');
-
-                thumbsUp.classList.toggle('active', rating === 1);
-                thumbsDown.classList.toggle('active', rating === -1);
-
-                // Also mark as read when rating
-                markAsRead(articleId);
-            }
+            markAsRead(articleId);
         }
     } catch (err) {
         console.error('Failed to rate article:', err);
@@ -1049,22 +1170,42 @@ async function saveSettings() {
         time_margin_percent: Math.min(50, Math.max(5, timeMargin))
     };
 
+    const payload = {
+        location: {
+            location_name: locationName,
+            location_lat: locationLat,
+            location_lon: locationLon,
+            nws_zone_codes: ''
+        },
+        sports_teams: settingsData.sports_teams,
+        traffic_routes: settingsData.traffic_routes,
+        traffic_options: trafficOptions
+    };
+
+    if (!navigator.onLine) {
+        try {
+            await OfflineManager.queueAction({
+                type: 'settings',
+                payload: payload
+            });
+            alert('Settings queued (Offline Mode). Will sync when online.');
+            closeSourceManager();
+        } catch (e) {
+            console.error('Failed to queue settings:', e);
+            alert('Failed to save settings offline.');
+        } finally {
+            saveBtn.textContent = originalText;
+            saveBtn.disabled = false;
+        }
+        return;
+    }
+
     try {
         // 1. Save settings
         const response = await fetch(`${API_BASE}/api/settings`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                location: {
-                    location_name: locationName,
-                    location_lat: locationLat,
-                    location_lon: locationLon,
-                    nws_zone_codes: ''
-                },
-                sports_teams: settingsData.sports_teams,
-                traffic_routes: settingsData.traffic_routes,
-                traffic_options: trafficOptions
-            })
+            body: JSON.stringify(payload)
         });
 
         if (!response.ok) {

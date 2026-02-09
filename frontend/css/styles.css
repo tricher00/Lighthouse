@@ -102,8 +102,9 @@ header {
     gap: var(--spacing-sm);
 }
 
-.logo .icon {
-    font-size: 1.75rem;
+.logo-icon {
+    width: 32px;
+    height: 32px;
 }
 
 .logo h1 {
@@ -1863,4 +1864,87 @@ body.reader-open {
 
 .remove-route-btn:hover {
     color: var(--error);
+}
+
+/* Offline Banner */
+/* Offline Banner */
+.offline-banner {
+    background: linear-gradient(90deg, #f39c12, #e74c3c);
+    color: white;
+    text-align: center;
+    padding: 0.75rem;
+    font-weight: 500;
+    display: none;
+}
+
+.offline-banner:not(.hidden) {
+    display: block;
+}
+
+body.offline .offline-banner {
+    display: block;
+}
+
+/* Install Banner */
+.install-banner {
+    position: fixed;
+    bottom: 1.5rem;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 0.75rem 1rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    z-index: 9999;
+    min-width: 320px;
+    backdrop-filter: blur(10px);
+}
+
+.install-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+}
+
+.install-content {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+}
+
+.install-title {
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: var(--text-primary);
+}
+
+.install-desc {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.install-banner.hidden {
+    display: none;
+}
+
+.btn-dismiss {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 1.25rem;
+}
+
+/* Unavailable offline state */
+.unavailable {
+    text-align: center;
+    padding: var(--spacing-md);
+    color: var(--text-muted);
+    font-style: italic;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: var(--radius-sm);
 }

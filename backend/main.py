@@ -185,10 +185,32 @@ async def health_check():
 app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
 
 
+@app.get("/manifest.json")
+async def serve_manifest():
+    return FileResponse(FRONTEND_DIR / "manifest.json", media_type="application/manifest+json")
+
+
+@app.get("/sw.js")
+async def serve_sw():
+    return FileResponse(FRONTEND_DIR / "sw.js", media_type="application/javascript")
+
+
+
 @app.get("/")
 async def serve_dashboard():
     """Serve the main dashboard HTML."""
     return FileResponse(FRONTEND_DIR / "index.html")
+
+
+@app.get("/index.html")
+async def serve_index():
+    return FileResponse(FRONTEND_DIR / "index.html")
+
+
+@app.get("/favicon.ico")
+async def serve_favicon():
+    return FileResponse(FRONTEND_DIR / "icons/icon-192.png")
+
 
 
 @app.get("/reader")

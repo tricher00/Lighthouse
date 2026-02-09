@@ -66,6 +66,34 @@ async def rate_article(article_id: int, request: RatingRequest, db: Session = De
     return {"success": True, "article_id": article_id, "rating": request.rating}
 
 
+class SyncRatingsRequest(BaseModel):
+    ratings: list[dict]  # [{"article_id": int, "rating": int}]
+    device_id: str
+
+
+@router.post("/sync-ratings")
+async def sync_ratings(request: SyncRatingsRequest, db: Session = Depends(get_db)):
+    """Sync ratings from offline client."""
+    updated = 0
+    from database import SyncLog
+    
+    for item in request.ratings:
+        article = db.query(Article).filter(Article.id == item["article_id"]).first()
+        if article:
+            article.rating = item["rating"]
+            article.rated_at = datetime.utcnow()
+            updated += 1
+    
+    db.commit()
+    
+    sync_log = SyncLog(device_id=request.device_id, sync_type="ratings", articles_synced=updated)
+    db.add(sync_log)
+    db.commit()
+    
+    return {"success": True, "ratings_synced": updated}
+
+
+
 @router.post("/sync-read-status")
 async def sync_read_status(request: SyncReadStatusRequest, db: Session = Depends(get_db)):
     """

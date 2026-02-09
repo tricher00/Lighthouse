@@ -1,4 +1,4 @@
-# 🗼 Lighthouse
+# Lighthouse
 
 A personal content aggregator that replaces doomscrolling with intentional reading. Lighthouse brings together your news, sports, weather, and more into a single, customizable dashboard.
 
@@ -11,7 +11,9 @@ A personal content aggregator that replaces doomscrolling with intentional readi
 - **🤖 AI Summaries** - Optional LLM-powered article summaries (Groq or Gemini)
 - **🎬 Movie Releases** - New releases and upcoming films from TMDB
 - **💬 Reddit Integration** - Top posts from your favorite subreddits
-- **📱 Mobile-Friendly** - Responsive dark mode UI
+- **📱 Mobile-Friendly PWA** - Installable as a native-like app on Android/Desktop with offline support
+- **🌑 Dark Mode** - Easier on the eyes for night reading
+- **⚡ Offline Mode** - Read cached articles and queue actions when disconnected
 
 ## 🚀 Quick Start
 
